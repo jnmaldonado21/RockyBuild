@@ -2,7 +2,7 @@
 (function () {
   const CFG = Object.assign(
     { apiUrl: '', title: 'Cut list', sheetUrl: '', pollSeconds: 30, maxBundle: 10, kerf: 0.125,
-      appName: 'Tackle, Track, Complete', appShort: 'TTC' },
+      appName: 'SawHorse', appTagline: 'Tackle, Track, Complete' },
     window.CUT_CONFIG || {}
   );
   const DEMO = !CFG.apiUrl;
@@ -322,10 +322,15 @@
     return [...seen].filter(([, where]) => where.length > 1);
   }
 
+  const projectTitle = (fallback = 'Cut list') => {
+    const t = String(CFG.title || '').trim();
+    const brandish = ['sawhorse', 'tackle, track, complete', 'ttc', 'tackle, track, complete (ttc)', ''];
+    return brandish.includes(t.toLowerCase()) ? fallback : t;
+  };
   const today = () => { const d = new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); };
 
   window.Cut = {
-    CFG, DEMO, STATUSES, CLS, normStatus, esc, clone, store, api, today,
+    CFG, DEMO, STATUSES, CLS, normStatus, esc, clone, store, api, today, projectTitle,
     unitStatus: (sheets, units, stateOf) => P.unitStatus(sheets, units, stateOf), UNIT_STAGES: P.UNIT_STAGES,
     effDone, leftToCut, pieceRange, bundlesFor, parseInches, fmtIn, lumberFor, lumberReport, piecesLeftFor, isSheetGood,
     tapeHex, inkOn, swatch, timeAgo, compressImage, photoThumb, photoLink,
