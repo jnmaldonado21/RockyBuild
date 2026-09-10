@@ -412,8 +412,9 @@
   });
 
   /* ---------- Start ---------- */
-  document.title = C.CFG.title + ': build overview';
-  $('title').textContent = C.CFG.title === 'Cut list' ? 'Build overview' : C.CFG.title + ' build overview';
+  const proj = /^cut list$/i.test(C.projectTitle('')) ? '' : C.projectTitle('');
+  document.title = `${proj ? proj + ' build overview' : 'Build overview'} | ${C.CFG.appName || 'SawHorse'}`;
+  $('title').textContent = proj ? proj + ' build overview' : 'Build overview';
   if (C.CFG.sheetUrl) { $('sheetLink').href = C.CFG.sheetUrl; $('sheetLink').hidden = false; }
   if (L.pin) C.api.post({ action: 'checkPin', pin: L.pin }).then(r => { L.pinOk = !!(r && r.ok); if (L.data) { renderInbox(L.data); renderCrew(L.data); } }).catch(() => {});
   document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });
