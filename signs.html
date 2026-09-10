@@ -4,11 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
-<title>QR signs</title>
+<title>QR signs | SawHorse</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/styles.css">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,600..900&display=swap" rel="stylesheet">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2212%22%20fill%3D%22%231C232B%22/%3E%3Cg%20transform%3D%22translate%280%208%29%22%3E%3Cg%20stroke-linecap%3D%22round%22%20fill%3D%22none%22%20stroke%3D%22%23fff%22%3E%3Cpath%20d%3D%22M19%2016%20L15%2043%20M45%2016%20L49%2043%22%20stroke-width%3D%224.5%22%20opacity%3D%220.5%22/%3E%3Cpath%20d%3D%22M14%2016%20L6%2044%20M50%2016%20L58%2044%22%20stroke-width%3D%226%22/%3E%3Cpath%20d%3D%22M10%2032%20H54%22%20stroke-width%3D%224.5%22/%3E%3C/g%3E%3Crect%20x%3D%222%22%20y%3D%225%22%20width%3D%2260%22%20height%3D%2212%22%20rx%3D%222.5%22%20fill%3D%22%23F6C21C%22/%3E%3C/g%3E%3C/svg%3E">
+<link rel="stylesheet" href="assets/styles.css?v=20260911a">
 <style>
   .screen-only { max-width: 1000px; margin: 0 auto; padding: 20px 16px 0; }
   .screen-only p { max-width: 70ch; }
@@ -25,7 +27,11 @@
   .sign-body .qr svg { width: 100%; height: auto; display: block; }
   .sign-body .scan { font: 700 clamp(18px, 3.2vw, 30px)/1.15 var(--cond); margin: 5% 0 2%; }
   .sign-body .rules { font-size: clamp(11px, 1.8vw, 16px); margin: 0; color: var(--ink); max-width: 36ch; }
-  .sign-url { font-size: clamp(8px, 1.2vw, 11px); color: var(--muted); padding: 0 6% 4%; text-align: center; word-break: break-all; }
+  .sign-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 6% 4%; }
+  .sign-brand { display: inline-flex; align-items: center; gap: 6px; color: var(--ink); flex: none; }
+  .sign-brand .brand-mark { width: 26px; height: 20px; color: var(--ink); }
+  .sign-brand b { font: 800 13px/1 var(--display); font-stretch: 125%; }
+  .sign-url { font-size: clamp(8px, 1.2vw, 11px); color: var(--muted); text-align: right; word-break: break-all; }
 
   @media print {
     @page { size: letter portrait; margin: 0.4in; }
@@ -41,10 +47,18 @@
     .sign-body .scan { font-size: 28pt; }
     .sign-body .rules { font-size: 15pt; }
     .sign-url { font-size: 9pt; }
+    .sign-brand .brand-mark { width: 0.45in; height: 0.34in; }
+    .sign-brand b { font-size: 12pt; }
   }
 </style>
 </head>
 <body>
+<div class="brandbar screen-only">
+  <div class="brandbar-inner">
+    <a class="brand" href="./" aria-label="SawHorse, crew page"><svg class="brand-mark" viewBox="0 0 64 48" aria-hidden="true" focusable="false"><g stroke-linecap="round" fill="none" stroke="currentColor"><path d="M19 16 L15 43 M45 16 L49 43" stroke-width="4.5" opacity="0.5"/><path d="M14 16 L6 44 M50 16 L58 44" stroke-width="6"/><path d="M10 32 H54" stroke-width="4.5"/></g><rect x="2" y="5" width="60" height="12" rx="2.5" fill="#F6C21C"/><path d="M8 5v4.5M14 5v2.8M20 5v4.5M26 5v2.8M32 5v4.5M38 5v2.8M44 5v4.5M50 5v2.8M56 5v4.5" stroke="#1C232B" stroke-width="1.6"/></svg><span class="brand-name">SawHorse</span></a>
+    <span class="brand-tag">Tackle, Track, Complete</span>
+  </div>
+</div>
 <div class="screen-only">
   <div class="top-row">
     <h1>QR signs</h1>
@@ -60,15 +74,16 @@
 
 <div class="signs" id="signs"></div>
 
-<script src="assets/config.js"></script>
-<script src="assets/demo-data.js"></script>
-<script src="assets/planner.js"></script>
-<script src="assets/common.js"></script>
-<script src="assets/qrcode.js"></script>
+<script src="assets/config.js?v=20260911a"></script>
+<script src="assets/demo-data.js?v=20260911a"></script>
+<script src="assets/planner.js?v=20260911a"></script>
+<script src="assets/common.js?v=20260911a"></script>
+<script src="assets/qrcode.js?v=20260911a"></script>
 <script>
 (function () {
   const C = window.Cut;
   const base = new URL('./', location.href).href;
+  const BRAND = document.querySelector('.brandbar .brand-mark').outerHTML;
   if (location.protocol === 'file:') {
     const w = document.getElementById('urlWarn');
     w.hidden = false;
@@ -84,7 +99,7 @@
         <p class="scan">${C.esc(scan)}</p>
         <p class="rules">${C.esc(rules)}</p>
       </div>
-      <p class="sign-url">${C.esc(url)}</p>
+      <div class="sign-foot"><span class="sign-brand">${BRAND}<b>SawHorse</b></span><span class="sign-url">${C.esc(url)}</span></div>
     </article>`;
   }
 
