@@ -31,6 +31,7 @@
       if ($('signoff').open) renderChangeList();
       if ($('ask').open) renderAnswers();
       if (!S.opened && decodeURIComponent(location.hash.slice(1)) === 'safety') openSafety();
+      if (!S.opened) maybeFirstTour();
       S.opened = true;
     } catch (err) {
       console.error(err);
@@ -945,7 +946,125 @@
     `;
   }
 
-  function openGuide() { $('guideBody').innerHTML = guideHTML(); $('guide').showModal(); }
+  function openGuide() { if ($('tour').open) $('tour').close(); $('guideBody').innerHTML = guideHTML(); $('guide').showModal(); }
+
+  /* ================= First-run tour: Tackle, Track, Complete ================= */
+  const APP = C.CFG.appName, SHORT = C.CFG.appShort;
+  let tourAt = 0;
+
+  function tourSlides() {
+    const areas = S.sheets.map(sh => sh.name);
+    const areaList = areas.length > 1 ? areas.slice(0, -1).join(', ') + ', or ' + areas[areas.length - 1] : (areas[0] || 'your area');
+    const swatches = areas.map(a => `<span class="mock-swatch">${C.swatch(S.tape[a], 'lg')}<span>${C.esc(a)}</span></span>`).join('');
+    const red = C.tapeHex(S.tape[areas[0]] || 'Red');
+    return [
+      { title: `First time using ${APP} (${SHORT})?`,
+        body: `Here's a quick tour of how the app works: how to pick up a task, keep track of it, and mark it complete. It takes about a minute.`,
+        art: `<div class="mock-wordmark"><span>Tackle</span><span>Track</span><span>Complete</span></div>` },
+      { title: 'Sign in once',
+        body: `Tap <strong>Sign in or join the crew</strong>, then <strong>I'm new</strong>, and enter your name. You'll get a 4-digit PIN. Screenshot it; you'll need it on any other phone. This phone remembers you.`,
+        art: `<div class="mock-stack"><p class="mock-line">Welcome, <strong>Sam</strong>. Your PIN is:</p><span class="big-pin mock-pin">4821</span></div>` },
+      { title: 'Pick your area',
+        body: `Use the menu at the top to choose ${C.esc(areaList)}. Each area has its own tape color. Scanning the sign on a stack opens that area, and you can switch anytime.`,
+        art: `<div class="mock-stack"><div class="mock-picker">${C.esc(areas[0] || 'Framing')}</div><div class="mock-swatches">${swatches}</div></div>` },
+      { kicker: 'Tackle', title: 'Claim a task, then cut',
+        body: `Found something to work on? Tap <strong>I'm on it</strong>. Your name shows up for everyone, so two people don't cut the same pieces. The <strong>Cut plan</strong> tab shows which pieces come out of each board, spare wood first.`,
+        art: `<div class="mock-stack"><div class="mock-row"><span class="claim-btn">I'm on it</span><span class="mock-arrow" aria-hidden="true">→</span><span class="claim mine">You're on it</span></div>
+          <div class="board mock-board"><span class="seg" style="width:52%;--area:${red}">L 50"</span><span class="seg" style="width:25%;--area:${C.tapeHex(S.tape[areas[3]] || 'Green')}">AR</span><span class="seg" style="width:22%;--area:${C.tapeHex(S.tape[areas[2]] || 'Blue')}">AJ</span></div></div>` },
+      { kicker: 'Tackle', title: 'Number it, bundle it',
+        body: `Number every piece as you cut it: A1, A2, A3. Bundle up to ${C.CFG.maxBundle} of the same letter, tape both ends in your area's color, write the letter and numbers on the tape, and stack it with that color. The full steps are under <strong>How to label and bundle</strong>.`,
+        art: `<div class="mock-bundle">${bundleSVG(red, 'A 1–10', ['A1', 'A2', 'A3'])}</div>` },
+      { kicker: 'Track', title: 'Update as you go',
+        body: `Tap <strong>+</strong> for each piece that's numbered and bundled, or change the status. Changes are marked <strong>Not saved yet</strong> until you sign off, so you can update several lines at once.`,
+        art: `<div class="mock-stack"><div class="mock-row"><span class="mock-select s-ip">In Progress</span>
+          <span class="counter mock-counter"><span class="mock-btn">−</span><span class="count"><b>4</b> / 8</span><span class="mock-btn">+</span></span></div>
+          <div class="mock-row mock-pills">${C.STATUSES.map(st => `<span class="pill ${st.cls}">${st.name}</span>`).join('')}</div></div>` },
+      { kicker: 'Complete', title: 'Sign off with a photo',
+        body: `When you're done, tap <strong>Sign off and save</strong> at the bottom and take a photo with the tape label readable. Nothing saves without a photo. Leadership sees your work right away, and your claim clears once the line is Bundled.`,
+        art: `<div class="mock-savebar"><p><strong>2</strong> changes not saved yet</p><span class="btn on-dark">Sign off and save</span></div>` },
+      { kicker: 'Complete', title: 'Build it',
+        body: `When every piece a unit needs is bundled, it shows up as <strong>Ready to build</strong> on the <strong>Build</strong> tab. Change its stage as you build and sign off with a photo, the same as cuts.`,
+        art: `<div class="unit mock-unit"><div class="unit-head"><h4>4' door #1</h4><span class="pill s-tag">Ready to build</span></div>
+          <p class="unit-parts"><span class="part ok">F 2/2</span><span class="part ok">G 2/2</span><span class="part ok">H 2/2</span></p></div>` },
+      { title: 'Stuck or out of wood?',
+        body: `Set the line to <strong>Need to Purchase</strong> so leadership knows what to buy. For anything else, tap <strong>Message leadership</strong>. Answers show up there for the whole crew.`,
+        art: `<div class="mock-row"><span class="pill s-buy mock-big-pill">Need to Purchase</span><span class="btn-quiet mock-quiet">Message leadership</span></div>` },
+      { title: 'Safety first, then go',
+        body: `Each day the app offers a one-minute safety check-in: glasses on, hearing protection in, vacuum running, no gloves at the saw. You can replay this tour anytime from <strong>How to use ${SHORT}</strong>.`,
+        art: `<ul class="checklist mock-check"><li><label><input type="checkbox" checked disabled><span><strong>Safety glasses on</strong></span></label></li>
+          <li><label><input type="checkbox" checked disabled><span><strong>Hearing protection in</strong></span></label></li>
+          <li><label><input type="checkbox" checked disabled><span><strong>No gloves at the saw</strong></span></label></li></ul>` }
+    ];
+  }
+
+  function renderTour() {
+    const slides = tourSlides();
+    tourAt = Math.max(0, Math.min(tourAt, slides.length - 1));
+    const sl = slides[tourAt];
+    const last = tourAt === slides.length - 1;
+    $('tourBody').innerHTML = `<div class="tour-slide" role="group" aria-roledescription="slide" aria-label="${tourAt + 1} of ${slides.length}">
+      <div class="tour-art" aria-hidden="true">${sl.art}</div>
+      ${sl.kicker ? `<p class="tour-kicker">${C.esc(sl.kicker)}</p>` : ''}
+      <h2 id="tourTitle">${C.esc(sl.title)}</h2>
+      <p class="tour-text">${sl.body}</p>
+    </div>`;
+    $('tourCount').textContent = `${tourAt + 1} of ${slides.length}`;
+    $('tourBack').disabled = tourAt === 0;
+    $('tourNext').textContent = last ? (me() ? 'Get started' : 'Join the crew') : tourAt === 0 ? 'Start' : 'Next';
+    $('tourDots').innerHTML = slides.map((x, i) =>
+      `<button type="button" class="tour-dot" data-go="${i}" aria-label="Slide ${i + 1}: ${C.esc(x.title)}" ${i === tourAt ? 'aria-current="step"' : ''}></button>`).join('');
+  }
+
+  function openTour() {
+    tourAt = 0;
+    renderTour();
+    if (!$('tour').open) $('tour').showModal();
+    $('tourNext').focus();
+  }
+  function closeTour() {
+    C.store.set('tourSeen', true);
+    if ($('tour').open) $('tour').close();
+  }
+  function tourGo(i) { tourAt = i; renderTour(); }
+
+  $('openTour').addEventListener('click', openTour);
+  $('tourSkip').addEventListener('click', closeTour);
+  $('tourBack').addEventListener('click', () => tourGo(tourAt - 1));
+  $('tourNext').addEventListener('click', () => {
+    if (tourAt < tourSlides().length - 1) return tourGo(tourAt + 1);
+    closeTour();
+    if (!me()) openAuth('');
+  });
+  $('tourDots').addEventListener('click', e => {
+    const b = e.target.closest('[data-go]');
+    if (!b) return;
+    tourGo(+b.dataset.go);
+    const cur = $('tourDots').querySelector('[aria-current]'); if (cur) cur.focus();
+  });
+  $('tour').addEventListener('close', () => C.store.set('tourSeen', true));
+  document.addEventListener('keydown', e => {
+    if (!$('tour').open || e.target.matches('input, select, textarea')) return;
+    if (e.key === 'ArrowRight') { e.preventDefault(); if (tourAt < tourSlides().length - 1) tourGo(tourAt + 1); }
+    if (e.key === 'ArrowLeft') { e.preventDefault(); if (tourAt > 0) tourGo(tourAt - 1); }
+  });
+  // Swipe left/right on phones
+  let swipeX = null;
+  $('tourBody').addEventListener('pointerdown', e => { swipeX = e.clientX; });
+  $('tourBody').addEventListener('pointerup', e => {
+    if (swipeX === null) return;
+    const dx = e.clientX - swipeX; swipeX = null;
+    if (Math.abs(dx) < 50) return;
+    if (dx < 0 && tourAt < tourSlides().length - 1) tourGo(tourAt + 1);
+    if (dx > 0 && tourAt > 0) tourGo(tourAt - 1);
+  });
+
+  // First visit on this device: show the tour, unless the page was opened for something else (like the saw-station sign).
+  function maybeFirstTour() {
+    if (C.store.get('tourSeen', false)) return;
+    if (decodeURIComponent(location.hash.slice(1)) === 'safety') return;
+    if (document.querySelector('dialog[open]')) return;
+    openTour();
+  }
   $('openGuide').addEventListener('click', openGuide);
   $('areaBanner').addEventListener('click', e => { if (e.target.closest('[data-guide]')) openGuide(); });
 
