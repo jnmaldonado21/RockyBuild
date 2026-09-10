@@ -8,6 +8,7 @@ Three pages for the build, hosted free on GitHub Pages, with a Google Sheet as t
   - A form for counting the spare wood pile.
   - The labeling and bundling guide.
   - An optional safety check-in.
+  - A first-run tour of how to use the app.
   - Sign-up with a 4-digit PIN, so every save is tied to a real person.
   - An "I'm on it" button so people can see who's working on what.
   - A Build tab showing which units have all their parts and are ready to assemble.
@@ -69,6 +70,18 @@ On the leadership page, **To buy** = new boards the plan needs + the extra % fro
 **Recount before you buy.** The spare count is a snapshot. As the crew cuts, they use up spare wood, but the count on file doesn't change. The leadership page and the daily email warn you when sign-offs have happened since the last count.
 
 The "8' studs" at most stores are precut to 92 5/8", which is too short for the 96" pieces. Buy true 96" boards, and count any precut studs in the pile at 92 5/8". There's a quick-add button for that.
+
+### First-run tour
+
+The first time someone opens the crew page on a device, a short tour explains the app in 10 slides, organized as **Tackle** (claim a task and cut it), **Track** (update as you go), and **Complete** (sign off with a photo). Each slide shows a copy of the actual button or screen it describes.
+
+- **Getting around:** people can move through it with Next and Back, the dots, swiping on a phone, or the arrow keys.
+- **Skipping:** anyone can skip it.
+- **Finishing:** the last slide opens sign-in if they haven't joined yet.
+- **Replaying:** **How to use TTC** at the top of the page replays it anytime.
+- **The saw-station sign:** scanning that sign opens the safety check-in instead of the tour.
+
+The app name comes from `appName` and `appShort`, which default to "Tackle, Track, Complete" and "TTC". To change them, add either one to `config.js`.
 
 ### Crew sign-in
 
