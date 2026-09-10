@@ -17,6 +17,7 @@
   --buy-chip: #FECACA; --buy-edge: #DC2626; --buy-text: #7F1D1D; --buy-tint: #FDF0F0;
 
   --cond: 'Barlow Condensed', 'Arial Narrow', sans-serif;
+  --display: 'Archivo', 'Barlow', system-ui, sans-serif;
   --body: 'Barlow', system-ui, sans-serif;
 }
 * { box-sizing: border-box; }
@@ -34,9 +35,18 @@ a { color: var(--focus); }
 .top, main { max-width: 1000px; margin: 0 auto; padding-left: 16px; padding-right: 16px; }
 .top { padding-top: 20px; padding-bottom: 12px; }
 .top-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-h1 { margin: 0; font: 700 36px/1 var(--cond); letter-spacing: 0.005em; }
-h2 { font: 700 26px/1.1 var(--cond); margin: 0 0 12px; }
-h3 { font: 700 20px/1.15 var(--cond); margin: 0 0 8px; }
+h1 { margin: 0; font: 800 34px/1.05 var(--display); font-stretch: 100%; letter-spacing: -0.01em; }
+h2 { font: 800 24px/1.15 var(--display); font-stretch: 100%; letter-spacing: -0.005em; margin: 0 0 12px; }
+h3 { font: 700 19px/1.2 var(--display); margin: 0 0 8px; }
+
+/* ---------- SawHorse brand bar ---------- */
+.brandbar { background: var(--ink); color: #fff; }
+.brandbar-inner { max-width: 1000px; margin: 0 auto; padding: 10px 16px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.brand { display: inline-flex; align-items: center; gap: 10px; color: #fff; text-decoration: none; }
+.brand-mark { width: 40px; height: 30px; flex: none; color: #fff; }
+.brand-name { font: 800 22px/1 var(--display); font-stretch: 125%; letter-spacing: -0.01em; }
+.brand-tag { font: 600 14px/1 var(--body); color: #C9CFD6; padding-left: 14px; border-left: 1px solid rgba(255,255,255,0.25); }
+.brand:focus-visible { outline-color: var(--tape); }
 .top-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
 main { padding-bottom: 96px; }
 
@@ -433,7 +443,9 @@ details.area-detail .data { border: 0; border-top: 1px solid var(--line); border
 
 /* ---------- Phones ---------- */
 @media (max-width: 720px) {
-  h1 { font-size: 30px; }
+  h1 { font-size: 28px; }
+  .brand-name { font-size: 20px; }
+  .brand-mark { width: 34px; height: 26px; }
   .cuts.stack thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
   .cuts.stack, .cuts.stack tbody { display: block; }
   .cuts.stack tr.section, .cuts.stack tr.group, .cuts.stack tr.section th, .cuts.stack tr.group th { display: block; }
@@ -485,7 +497,7 @@ dialog.tour { width: min(560px, calc(100% - 24px)); }
 .tour .sheet-head { padding: 12px 18px; }
 .tour-count { margin: 0; font: 600 14px/1 var(--body); color: var(--muted); font-variant-numeric: tabular-nums; }
 .tour-body { padding-top: 18px; touch-action: pan-y; }
-.tour-slide h2 { font-size: 30px; margin: 0 0 10px; }
+.tour-slide h2 { font-size: 28px; margin: 0 0 10px; }
 .tour-kicker { margin: 0 0 4px; font: 700 18px/1 var(--cond); color: #9A6A00; }
 .tour-text { margin: 0; font-size: 17px; line-height: 1.5; max-width: 60ch; }
 .tour-art {
@@ -502,13 +514,16 @@ dialog.tour { width: min(560px, calc(100% - 24px)); }
 .tour-slide { animation: tourIn 0.22s ease-out; }
 @keyframes tourIn { from { opacity: 0; transform: translateX(14px); } to { opacity: 1; transform: none; } }
 
-.mock-wordmark { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
-.mock-wordmark span {
-  font: 700 38px/1 var(--cond); padding: 6px 14px 4px; background: var(--tape); border-radius: 3px;
+.mock-lockup { display: flex; flex-direction: column; align-items: center; gap: 14px; color: var(--ink); }
+.mock-lockup .brand-row { display: flex; align-items: center; gap: 12px; }
+.mock-lockup .brand-mark { width: 72px; height: 54px; color: var(--ink); }
+.mock-lockup .brand-name { font-size: 34px; }
+.mock-tagline { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.mock-tagline span {
+  font: 700 18px/1 var(--display); padding: 7px 12px 6px; background: var(--tape); border-radius: 3px;
   box-shadow: inset 0 -3px 0 rgba(120, 80, 0, 0.18);
 }
-.mock-wordmark span:nth-child(2) { margin-left: 28px; }
-.mock-wordmark span:nth-child(3) { margin-left: 56px; background: var(--tag-chip); }
+.mock-tagline span:last-child { background: var(--tag-chip); }
 .mock-stack { display: flex; flex-direction: column; align-items: center; gap: 12px; width: 100%; }
 .mock-line { margin: 0; }
 .mock-pin { margin: 0; font-size: 48px; }
@@ -533,12 +548,25 @@ dialog.tour { width: min(560px, calc(100% - 24px)); }
 .mock-check { width: 100%; max-width: 320px; margin: 0; background: var(--surface); }
 @media (max-width: 720px) {
   dialog.tour { width: 100%; }
-  .tour-slide h2 { font-size: 26px; }
+  .tour-slide h2 { font-size: 24px; }
   .tour-art { min-height: 160px; }
-  .mock-wordmark span { font-size: 32px; }
+  .mock-lockup .brand-name { font-size: 28px; }
+  .mock-tagline span { font-size: 16px; }
+  .brand-tag { font-size: 13px; }
   .tour-foot .btn { width: auto; min-width: 96px; }
   .tour-dots { gap: 5px; flex-wrap: nowrap; }
   .tour-dot { width: 7px; height: 7px; }
   .tour-dot[aria-current="step"] { width: 18px; }
 }
 @media (prefers-reduced-motion: reduce) { .tour-slide { animation: none; } }
+
+@media (max-width: 360px) { .brand-tag { display: none; } }
+@media (max-width: 420px) {
+  .brand-name { font-stretch: 112%; }
+  .brandbar-inner { gap: 10px; }
+  .brand-tag { padding-left: 10px; }
+}
+@media (max-width: 720px) {
+  .top-actions { display: grid; grid-template-columns: 1fr 1fr; }
+  .top-actions .btn-quiet { font-size: 15px; padding: 10px 8px; text-align: center; }
+}
