@@ -1,164 +1,203 @@
-# SawHorse
+# SawHorse setup guide
 
-**Tackle, Track, Complete.** Crew coordination for build shops: cut lists, claims, photo sign-offs, cut plans, and assembly readiness.
+About 45 minutes from start to a working site. You'll need:
 
-Three pages for the build, hosted free on GitHub Pages, with a Google Sheet as the shared database.
+- a **personal Google account** (not a university one; see Part 1, step 1);
+- a **GitHub account**;
+- this repo, unzipped: `cut-tracker.zip`;
+- the corrected spreadsheet: `Cut_list_updated.xlsx`.
 
-- **Crew page** (`index.html`): everything the crew needs on the shop floor.
-  - The checklist, where they track and sign off on cuts with their name and a photo.
-  - Board-by-board cut plans that use spare wood first.
-  - A form for counting the spare wood pile.
-  - The labeling and bundling guide.
-  - An optional safety check-in.
-  - A first-run tour of how to use the app.
-  - Sign-up with a 4-digit PIN, so every save is tied to a real person.
-  - An "I'm on it" button so people can see who's working on what.
-  - A Build tab showing which units have all their parts and are ready to assemble.
-  - Messages to leadership.
-- **Leadership page** (`leadership.html`): the overview for you and the directors.
-  - Progress overall and per area.
-  - What to buy after the spare wood is used.
-  - Lines the crew flagged as Need to Purchase.
-  - Who's working on what right now, and assembly status for every unit.
-  - The crew list, with PIN resets.
-  - The question inbox and safety check-ins.
-  - A photo feed of every sign-off.
-  - A button to email yourself the summary.
-- **QR signs** (`signs.html`): printable signs, one for each area's stack and one for the saw station.
+The crew doesn't need Google or GitHub accounts. They open the link, tap **I'm new**, and get a 4-digit PIN.
 
-```
-index.html            Crew page
-leadership.html       Leadership page
-signs.html            Printable QR signs
-assets/config.js      The only file you edit (API URL, title, bundle size, kerf)
-assets/planner.js     Cut planner (also copied into the bottom of Code.gs)
-assets/common.js      Shared code
-assets/crew.js        Crew page
-assets/leadership.js  Leadership page
-assets/qrcode.js      QR encoder (Kazuhiko Arase, MIT license)
-assets/styles.css     Shared styles
-assets/demo-data.js   Your cut list, used only in demo mode
-SETUP.md              Step-by-step setup
-apps-script/Code.gs   Backend; goes in the Google Sheet, not on GitHub
-```
+---
 
-Every page runs in demo mode until `config.js` has an API URL. In demo mode, all features work, but data stays in that browser. The demo leadership PIN is `1234`.
+## Part 1: The Google Sheet (5 minutes)
 
-## Setup
+1. **Sign in to your personal Google account.** University Google Workspace accounts usually block "anyone with the link" sharing, and that setting is what lets sign-off photos show up on the leadership page.
 
-Follow **[SETUP.md](SETUP.md)**. It covers the Google Sheet, the Apps Script backend, GitHub Pages, a test run, and how to make changes later.
+2. **Upload the corrected spreadsheet.** In Google Drive, choose **New > File upload**, then pick `Cut_list_updated.xlsx`. It has two changes from your original:
+   - The Frank Float labels are now **AR, AS, AT**. They used to be AP, AQ, AR, which clashed with King Cake.
+   - Frank Float has a **Jaw Frame** section heading, like the other tabs.
 
-## Features
+   If you'd rather edit your original instead, make those two changes by hand before going on.
 
-### Spare wood and cut plans
+3. **Convert it to a Google Sheet.** Open the uploaded file and choose **File > Save as Google Sheets**. A new tab opens with the Google Sheets version. Work only in this one from now on. You can delete the .xlsx from Drive.
 
-The crew counts the spare wood pile on the crew page (**Cut plan > Count spare wood**). They pick a size, then enter usable lengths and counts, like "74" ×6" or "96" ×25".
+4. **Rename the spreadsheet.** Click the title and name it something like **Bourbon & Bone Cut List**. The daily email uses this name as its subject line.
 
-- **A full recount** replaces what's on file for that size.
-- **More boards** adds to it. Use this for deliveries.
+Don't add any columns or tabs yourself. The script does that in Part 2.
 
-The cut plan then fits every piece still to cut into that wood and puts the rest on new 8' boards.
+---
 
-- **Kerf:** Every cut allows 1/8" for the blade. Twelve 8" pieces need two boards; eleven fit on one.
-- **Mixed areas:** Areas share boards to save lumber. A colored stripe on each piece shows which area's stack it goes to.
-- **Area view:** Choosing an area shows only boards that include that area's pieces. There's a link to show every board in the shop.
-- **Order:** Spare wood boards are listed first. Offcuts 2' or longer are flagged as worth keeping.
-- **How the plan is built:** The planner tries three strategies and keeps whichever needs the fewest new boards. It was checked against 200 random spare-wood piles, and every plan was valid.
+## Part 2: The Google Apps Script (15 minutes)
 
-### Lumber to buy
+### Paste in the code
 
-On the leadership page, **To buy** = new boards the plan needs + the extra % from the Lumber tab. There's no separate "purchased" count. When a delivery arrives, the crew adds it with **Count spare wood > More boards**.
+1. In the Google Sheet, choose **Extensions > Apps Script**. A new tab opens with a file called `Code.gs` containing `function myFunction() {}`.
+2. Click **Untitled project** at the top and rename it **SawHorse**.
+3. Select everything in `Code.gs` and delete it.
+4. Open `apps-script/Code.gs` from the repo in any text editor, copy **all** of it (about 1,350 lines), and paste it in.
+5. Save with **Ctrl+S** (Cmd+S on a Mac).
 
-**Recount before you buy.** The spare count is a snapshot. As the crew cuts, they use up spare wood, but the count on file doesn't change. The leadership page and the daily email warn you when sign-offs have happened since the last count.
+### Run setup once
 
-The "8' studs" at most stores are precut to 92 5/8", which is too short for the 96" pieces. Buy true 96" boards, and count any precut studs in the pile at 92 5/8". There's a quick-add button for that.
+6. In the toolbar, find the function dropdown (it may say `doGet`). Choose **setup**, then click **Run**.
+7. Google asks for permission. Click **Review permissions**, pick your account, and you'll see **"Google hasn't verified this app."** That warning is normal for a script you wrote yourself. Click **Advanced**, then **Go to SawHorse (unsafe)**, then **Allow**. The script asks for four things:
+   - **This spreadsheet:** to read cuts and write statuses.
+   - **Google Drive:** to store sign-off photos in a "Cut list photos" folder.
+   - **Send email as you:** for the daily summary, which goes only to you.
+   - **Run on a schedule:** so the summary sends itself each evening.
+8. When the run finishes, the **Execution log** at the bottom shows:
+   `Setup complete. Leadership PIN: 123456`
+   Copy the PIN. You and the directors use it to reply to crew questions and to send the summary on demand. To change it later, go to **Project Settings** (gear icon) **> Script properties > LEAD_PIN**.
 
-### First-run tour
+### Check the new tabs
 
-The first time someone opens the crew page on a device, a short tour explains the app in 10 slides, organized as **Tackle** (claim a task and cut it), **Track** (update as you go), and **Complete** (sign off with a photo). Each slide shows a copy of the actual button or screen it describes.
+9. Go back to the Google Sheet. Each cut tab now has five new columns: **Status, Done, Updated, Updated By, Photo**. There are also these new tabs:
 
-- **Getting around:** people can move through it with Next and Back, the dots, swiping on a phone, or the arrow keys.
-- **Skipping:** anyone can skip it.
-- **Finishing:** the last slide opens sign-in if they haven't joined yet.
-- **Replaying:** **How to use SawHorse** at the top of the page replays it anytime.
-- **The saw-station sign:** scanning that sign opens the safety check-in instead of the tour.
+   | Tab | What to do now |
+   |---|---|
+   | **Crew** | Leave it empty. People add themselves from the crew page, and each gets a random 4-digit PIN. You can also type names here and run **setup** again to give each a PIN. Set **Active** to No to turn someone off. |
+   | **Tape Colors** | Check that it reads Framing = Red, Mausoleum = Yellow, King Cake = Blue, Frank Float = Green. |
+   | **Lumber** | Enter **Price each** for 2x4, 2x6, and 4'x8'. Board length is already 96 for lumber and blank for the MDF sheets. **Spare %** is extra on new boards for miscuts; set it to 0 to buy exactly the plan. |
+   | **Units** | Already filled in with the units we agreed on. No changes needed. |
+   | **Settings** | **Summary email** is already your address. **Summary hour** is 20, meaning 8 PM. You'll fill in **Leadership page URL** in Part 3. |
+   | **Stock, Log, Messages, Safety, Claims** | Leave these empty. The tool fills them in. |
 
-### Branding
+### Deploy it as a web app
 
-- **Product name:** SawHorse. The tagline is "Tackle, Track, Complete."
-- **Where the brand appears:** a dark bar at the top of every page, the browser-tab icon, the tour, and a small mark on each printed sign.
-- **The mark:** a sawhorse whose top rail is a tape measure.
-- **Fonts:** Archivo for the brand and headings, Barlow for body text, and Barlow Condensed for numbers and labels.
-- **`title` in `config.js` is the project name** (for example, `'Bourbon & Bone'`), not the product name. It shows as the page heading under the brand bar. If `title` is set to "SawHorse" or the tagline, the page shows "Cut list" instead, so the name doesn't appear twice.
-- **Renaming:** `appName` and `appTagline` can be overridden in `config.js`.
+10. Back in Apps Script, click **Deploy > New deployment**.
+11. Next to **Select type**, click the gear icon and choose **Web app**. Set:
+    - **Description:** `v1`
+    - **Execute as:** **Me**
+    - **Who has access:** **Anyone**. Choose "Anyone," not "Anyone with Google account," or the crew would need to sign in.
+12. Click **Deploy**. If it asks for permission again, allow it.
+13. Copy the **Web app URL**. It looks like `https://script.google.com/macros/s/AKfy…/exec`.
+14. **Test it:** paste the URL into a browser tab, add `?view=crew` to the end, and press Enter. You should see text starting with `{"ok":true,"sheets":[`. If you see an error page instead, check that access is set to **Anyone**.
 
-### Crew sign-in
+---
 
-Crew members join from the crew page: they tap **I'm new**, enter their name, and get a random 4-digit PIN. The phone remembers them after that. On another phone, or after signing out, they pick their name and enter the PIN.
+## Part 3: The GitHub repo and site (15 minutes)
 
-**What needs a PIN:** looking at the checklist, cut plan, and guides doesn't. Saving does, including sign-offs, claims, messages, safety check-ins, and spare-wood counts. The server checks name and PIN on every save, so no one can sign off as someone else.
+### Point the site at your sheet
 
-**Protections:**
-- **Duplicate names:** Joining with a name that's already taken is refused, with a suggestion to add a middle initial.
-- **Guessing:** After 5 wrong PINs, that name is locked for 15 minutes.
+1. Open `assets/config.js` in a text editor and fill in the top:
+   ```js
+   window.CUT_CONFIG = {
+     apiUrl: 'https://script.google.com/macros/s/PASTE-YOURS-HERE/exec',
+     title: 'Bourbon & Bone',   // your project's name; SawHorse branding is built in
+     sheetUrl: 'https://docs.google.com/spreadsheets/d/PASTE-YOURS-HERE/edit',
+     pollSeconds: 20,
+     maxBundle: 10,
+     kerf: 0.125
+   };
+   ```
+   - `apiUrl` is the web app URL from Part 2, step 13.
+   - `sheetUrl` is the Google Sheet's address from your browser bar. It adds an "Open the Google Sheet" button to the leadership page.
+   - Leave the rest as is.
 
-**Where PINs live:** PINs are stored in the **Crew** tab so leadership can look one up, and the website never sends them out. They're assigned randomly, not chosen, so nobody's reusing a PIN they use elsewhere. Leadership can issue a new PIN from the leadership page's **Crew** section.
+### Create the repo
 
-### Who's working on what
+2. On GitHub, click **New repository**. Name it something like `bourbon-bone-build` and make it **Public**. On free GitHub accounts, Pages only works for public repos; a private repo needs GitHub Pro. Public means anyone could read the code, which is fine here, since nothing secret is in it and the PIN lives in Apps Script, not the repo. Don't add a README; the repo has one.
 
-Every checklist line and every unit has an **I'm on it** button.
+3. **Upload the files.** Do one of the following.
 
-- **Tapping it:** Your name shows on that item for everyone within about 20 seconds, and on the leadership page under "Who's working on what."
-- **Two people at once:** If two people tap the same item at the same moment, the server gives it to the first one and tells the second.
-- **Editing someone else's item:** Changing a line someone else claimed asks "Sam is working on C. Make changes anyway?" It doesn't block you, since people often work in pairs.
-- **When claims clear:** A claim clears when that person signs off the line as Bundled (or the unit as Built), taps **Done for now**, or after 6 hours. **Take over** is for when someone leaves without clearing theirs.
+   **In the browser:** on the new repo's page, click **uploading an existing file**. Open the unzipped `cut-tracker` folder and drag in **what's inside it**, not the folder itself, so that `index.html` sits at the top level of the repo:
+   - `index.html`
+   - `leadership.html`
+   - `signs.html`
+   - `README.md` and `SETUP.md`
+   - the `assets` and `apps-script` folders
 
-Pages refresh every 20 seconds and whenever someone comes back to the tab. That isn't instant push, which would need a paid real-time database, but it's enough to keep a shop from doubling up.
+   Then click **Commit changes**.
 
-### Assembly (Build tab)
+   **With git:**
+   ```bash
+   cd cut-tracker
+   git init
+   git add .
+   git commit -m "SawHorse"
+   git branch -M main
+   git remote add origin https://github.com/YOUR-USERNAME/bourbon-bone-build.git
+   git push -u origin main
+   ```
 
-The **Units** tab lists the things that get built and the pieces each one uses, like `4' door #1 | F×2, G×2, H×2`. `setup()` fills in a starting list:
+### Turn on GitHub Pages
 
-- the front wall framing, the front wall MDF, and the upper back wall MDF;
-- two 4' doors and four 2' doors;
-- the lower roof, upper roof, and railing;
-- the Mausoleum;
-- the rolling platform, the King Cake frame, and the jaw frame.
+4. In the repo, go to **Settings > Pages**. Under **Build and deployment**:
+   - set **Source** to **Deploy from a branch**;
+   - set **Branch** to **main** and the folder to **/ (root)**;
+   - click **Save**.
+5. Wait a minute or two, then refresh. The top of the page shows **"Your site is live at `https://YOUR-USERNAME.github.io/bourbon-bone-build/`"**. Your links are:
+   - **Crew page:** `https://YOUR-USERNAME.github.io/bourbon-bone-build/`
+   - **Leadership page:** `https://YOUR-USERNAME.github.io/bourbon-bone-build/leadership.html`
+   - **QR signs:** `https://YOUR-USERNAME.github.io/bourbon-bone-build/signs.html`
+6. In the Google Sheet's **Settings** tab, paste the leadership page link into **Leadership page URL**. The daily email links to it.
 
-**How readiness works:** Bundled pieces are assigned to units in order, and units already being built go first. A unit shows as **Ready to build** once all of its pieces are covered. The Build tab groups units into Ready to build, Being built, Waiting on parts, and Built.
+---
 
-**Stages:** Not started → Building → Built → Finished → Loaded in. Changing a stage requires a sign-off with a name and photo, the same as cuts.
+## Part 4: Test it before the crew does (10 minutes)
 
-To change a unit, edit the Units tab: one row per physical unit, with parts written as `Label×count` and separated by commas. Labels are looked up in that unit's own area tab.
+Run through these on your phone. The crew page's status line should say **Up to date**, not "Demo."
 
-### Signing off
+1. **Join:** Open the crew page, tap **Sign in or join the crew**, then **I'm new**, and enter your name. Note the PIN it shows. In the sheet, the **Crew** tab should now have your name and that PIN.
+2. **Sign off:**
+   - Choose **Framing**.
+   - Tap **+** once on line **C**, then tap **Sign off and save**.
+   - Take a photo of anything and save. The form already knows who you are.
+   - In the sheet, line C should now read *In Progress, 1*, with your name, the time, and a photo link. The **Log** tab gets a row, and the photo appears in Drive under **Cut list photos**.
+3. **Claim:** Tap **I'm on it** on any line. On the leadership page, you should appear under **Who's working on what** within 20 seconds.
+4. **Photos and replies:** On the leadership page, enter your name and PIN to unlock replies. Your test sign-off should show with a photo thumbnail. If the thumbnail is blank, see Troubleshooting.
+5. **Email:** Click **Email me a summary** and check your inbox.
+6. **Spare wood:** On the crew page, go to **Cut plan > Count spare wood** and enter one test count. The plan should add a "From spare wood" section.
 
-- **What's required:** Changes stay on the phone as "Not saved yet" until someone signs off. Signing off needs a name and a photo. A note is optional.
-- **Edit conflicts:** If someone else changed the same line in the meantime, that change is blocked instead of overwriting theirs.
-- **Where it's recorded:** Every save is written to the Log tab.
+7. **PIN reset:** In the leadership page's **Crew** section, click **Reset PIN** next to your name. On the crew page, sign out and sign back in with the new PIN.
 
-### Safety check-in (optional)
+**Clear the test data** afterward, directly in the sheet:
+- Set line C back to **Not Started** with **Done** at **0**.
+- Delete your rows from **Log**, **Claims**, and **Stock**.
+- Delete the test photo from Drive.
 
-The crew page offers a one-minute check-in at the start of each day. The saw-station sign opens it directly.
+---
 
-- **Checklist:** safety glasses, hearing protection, dust collection running, no gloves at the saw (gloves are for carrying lumber), shop clothing, guards in place, unplug before blade changes, trained on today's tools, and a clear work area.
-- **Reference:** Each item links to a reference section with the relevant OSHA general industry standard (1910.133, 1910.95, 1910.132/138, 1910.213, 1910.242/243, and 1910.22). It notes that OSHA legally covers employers, and the shop follows these rules as its standard.
-- **Records:** Check-ins are saved to the Safety tab, and leadership sees who checked in today.
+## Part 5: Before the first build day
 
-### Daily summary email
+1. **Print the signs.** Open `/signs.html` on the **live site**, not a downloaded copy, and click **Print signs**. You get one sign per stack in its tape color, plus a saw-station sign that opens the safety check-in. Print on letter paper, and use color if you can.
+2. **Count the spare wood first.** Have one or two people go through the spare pile with **Count spare wood**, choosing **A full recount** for each size. Until that's done, the cut plan assumes every piece needs a new board.
+3. **Share the links.** Text the crew page link, or let people scan any stack sign. Everyone taps **I'm new** once and screenshots their PIN; their phone remembers them after that. Send the leadership link to the directors, and give them the leadership PIN if they'll answer questions or reset crew PINs.
+4. **Make your first lumber run** from the leadership page's **Lumber to buy** table, right after the spare-wood count. When lumber comes back, add it with **Count spare wood > More boards**.
 
-The daily email goes to you, so you can edit it and forward it to the directors. It includes:
+---
 
-- progress and pieces bundled since the last email, with thanks to whoever did the work;
-- per-area status;
-- flagged lines and open questions;
-- lumber still to buy, with cost, and a recount warning when the spare wood count is out of date;
-- safety check-ins and each sign-off, with photo links.
+## Making changes later
 
-It skips days with no activity unless you change that in Settings. **Email me a summary** on the leadership page sends one immediately. That button needs the PIN.
+| You want to… | Do this |
+|---|---|
+| Add or change a cut | Edit the cut tab in the sheet. Everyone sees it within 20 seconds. Keep every label unique across all tabs. |
+| Add a whole new area | Add a tab with the same five headers (Label/ID, Use, Dimension, Length, Quantity), then run **setup** again in Apps Script. That adds its tracking columns, a Tape Colors row, and any new Lumber sizes. |
+| Change the email time | Change **Summary hour** in Settings, then run **setup** again. |
+| Add a crew member | They join themselves from the crew page. To add someone yourself, type their name in the **Crew** tab and run **setup** to give them a PIN. |
+| Someone forgot their PIN | Leadership page **> Crew > Reset PIN**, then tell them the new one in person. Or look it up in the **Crew** tab. |
+| Remove someone | Set **Active** to No in the **Crew** tab. Their past sign-offs stay in the Log. |
+| Change a unit or its parts | Edit the **Units** tab, using `Label×count` separated by commas. |
+| Update the website files | Commit the changed file on GitHub. Pages redeploys within a minute or two; people may need to refresh. |
+| Update `Code.gs` | Paste in the new code and save. Then go to **Deploy > Manage deployments**, click the pencil icon, set **Version** to **New version**, and click **Deploy**. This keeps the same URL. Choosing *New deployment* instead would give you a new URL, and you'd have to update `config.js`. |
 
-## Limits and security
+---
 
-- **Load:** About 30 people is comfortably within Google's free limits.
-- **Who can change things:** Anyone with the crew link can sign off. The name and photo requirement, plus the Log tab, make every change traceable, but it isn't a login.
-- **Who can read things:** Anyone with the leadership link can read it. Only replying to messages and sending the summary need the PIN.
+## Troubleshooting
+
+- **The crew page says "Can't reach the sheet."**
+  1. Check that `apiUrl` in `config.js` is the `/exec` URL.
+  2. In **Manage deployments**, check that **Who has access** is **Anyone**.
+  3. Test the URL with `?view=crew` as in Part 2, step 14.
+- **The page still says "Demo."** `apiUrl` is empty, or the browser is showing an old copy of `config.js`. Commit the change and do a hard refresh (Ctrl+Shift+R).
+- **Photos save but don't show on the leadership page.** Your Google account blocks link sharing. Open the **Cut list photos** folder in Drive, click **Share**, and set **General access** to **Anyone with the link: Viewer**. If you can't change that setting, the account is managed by an organization; use a personal account.
+- **"Authorization required" or "Exception: You do not have permission."** A code update started using a new Google service. Run **setup** once from the editor to re-authorize, then deploy a **New version**.
+- **No daily email.**
+  - The email skips days with no new sign-offs or messages unless **Send when nothing changed** is set to Yes in Settings.
+  - Check spam, and check **Summary email** in Settings.
+  - To test, run `sendSummaryNow` from the Apps Script editor.
+- **"Too many wrong PINs."** After 5 wrong tries, that name is locked for 15 minutes. Resetting the PIN from the leadership page clears the lock right away.
+- **Sign-offs say "Someone else updated this line."** Two people changed the same line, and the tool blocked the second change instead of overwriting the first. Reopen the list and redo the change if it's still needed.
+- **Syntax errors when running setup.** Open **Project Settings** and make sure **Enable Chrome V8 runtime** is checked.
