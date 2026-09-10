@@ -1,7 +1,8 @@
 /* Shared code for the crew page and the leadership page. */
 (function () {
   const CFG = Object.assign(
-    { apiUrl: '', title: 'Cut list', sheetUrl: '', pollSeconds: 30, maxBundle: 10, kerf: 0.125 },
+    { apiUrl: '', title: 'Cut list', sheetUrl: '', pollSeconds: 30, maxBundle: 10, kerf: 0.125,
+      appName: 'Tackle, Track, Complete', appShort: 'TTC' },
     window.CUT_CONFIG || {}
   );
   const DEMO = !CFG.apiUrl;
