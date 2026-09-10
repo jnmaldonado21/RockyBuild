@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cut list</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+<header class="top">
+  <div class="top-row">
+    <h1 id="title">Cut list</h1>
+    <p id="sync" class="sync" role="status" aria-live="polite" data-state="busy">Loading…</p>
+  </div>
+  <p class="who-line" id="whoLine"></p>
+  <div class="top-actions">
+    <button type="button" class="btn-quiet" id="openGuide">How to label and bundle</button>
+    <button type="button" class="btn-quiet" id="openSafety">Shop safety</button>
+    <button type="button" class="btn-quiet" id="openAsk">Message leadership</button>
+  </div>
+</header>
+
+<main>
+  <label class="picker">
+    <span class="sr-only">Area</span>
+    <select id="area"><option value="">Choose an area…</option></select>
+  </label>
+
+  <div id="notice" class="notice" hidden></div>
+  <div id="safetyBanner" class="area-banner safety-banner" hidden>
+    <p><strong>Starting a shift?</strong> Take the one-minute safety check-in. It's optional.</p>
+    <button type="button" class="btn" id="safetyStart">Check in</button>
+    <button type="button" class="btn-quiet" id="safetyLater">Not today</button>
+  </div>
+  <div id="areaBanner" class="area-banner" hidden></div>
+  <p id="empty" class="empty">Pick an area to see its cuts and progress.</p>
+
+  <section id="view" hidden>
+    <div class="progress">
+      <p class="progress-text"><strong id="pDone">0</strong> of <strong id="pTotal">0</strong> pieces labeled and bundled</p>
+      <div id="tapeSlot"></div>
+      <div class="chips" id="chips" role="group" aria-label="Show only one status"></div>
+      <p class="filter-note" id="filterNote" hidden></p>
+    </div>
+
+    <div class="viewtabs" role="tablist" aria-label="View">
+      <button type="button" role="tab" id="tabList" aria-selected="true" aria-controls="checklist">Checklist</button>
+      <button type="button" role="tab" id="tabPlan" aria-selected="false" aria-controls="plan">Cut plan</button>
+      <button type="button" role="tab" id="tabBuild" aria-selected="false" aria-controls="build">Build</button>
+    </div>
+
+    <div id="plan" role="tabpanel" aria-labelledby="tabPlan" hidden></div>
+    <div id="build" role="tabpanel" aria-labelledby="tabBuild" hidden></div>
+
+    <div id="checklist" role="tabpanel" aria-labelledby="tabList">
+    <table class="cuts stack">
+      <thead>
+        <tr>
+          <th scope="col">Status</th>
+          <th scope="col">Label</th>
+          <th scope="col">Use</th>
+          <th scope="col">Size</th>
+          <th scope="col">Length</th>
+          <th scope="col">Bundled</th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+    </div>
+  </section>
+</main>
+
+<div class="savebar" id="savebar" hidden>
+  <div class="savebar-inner">
+    <p><strong id="stagedCount">0</strong> <span id="stagedWord">changes</span> not saved yet</p>
+    <button type="button" class="btn-quiet on-dark" id="discardBtn">Discard</button>
+    <button type="button" class="btn on-dark" id="reviewBtn">Sign off and save</button>
+  </div>
+</div>
+
+<!-- Sign-off -->
+<dialog id="signoff" class="sheet" aria-labelledby="signoffTitle">
+  <div class="sheet-head">
+    <h2 id="signoffTitle">Sign off on your work</h2>
+    <button type="button" class="icon-btn" data-close aria-label="Close">×</button>
+  </div>
+  <div class="sheet-body">
+    <p class="form-error" id="soError" hidden></p>
+    <ul class="change-list" id="changeList"></ul>
+    <p class="safety-line" id="soSafety"></p>
+    <div class="field" id="soNameField"></div>
+    <div class="field">
+      <span class="field-label">Photo of the finished work</span>
+      <p class="hint">Get the bundle in frame with the tape label readable.</p>
+      <label class="photo-pick" id="soPick">
+        <input type="file" accept="image/*" id="soPhoto" class="sr-only">
+        <span id="soPickText">Take or choose a photo</span>
+      </label>
+      <img id="soPreview" class="photo-preview" alt="Your photo" hidden>
+      <div class="photo-actions" id="soPhotoActions" hidden>
+        <button type="button" class="linkish" id="soRetake">Use a different photo</button>
+      </div>
+    </div>
+    <div class="field">
+      <label for="soNote">Note for leadership <span class="optional">(optional)</span></label>
+      <textarea id="soNote" rows="3"></textarea>
+    </div>
+  </div>
+  <div class="sheet-foot">
+    <p class="hint" id="soHint">Sign in and add a photo to save.</p>
+    <button type="button" class="btn" id="soSave" disabled>Save changes</button>
+  </div>
+</dialog>
+
+<!-- Message leadership -->
+<dialog id="ask" class="sheet" aria-labelledby="askTitle">
+  <div class="sheet-head">
+    <h2 id="askTitle">Message leadership</h2>
+    <button type="button" class="icon-btn" data-close aria-label="Close">×</button>
+  </div>
+  <div class="sheet-body">
+    <p class="form-error" id="askError" hidden></p>
+    <div class="field">
+      <span class="field-label" id="askTypeLabel">This is a</span>
+      <div class="seg" role="radiogroup" aria-labelledby="askTypeLabel">
+        <label><input type="radio" name="askType" value="Question" checked><span>Question</span></label>
+        <label><input type="radio" name="askType" value="Note"><span>Note</span></label>
+      </div>
+    </div>
+    <div class="two-up">
+      <div class="field">
+        <label for="askArea">Area <span class="optional">(optional)</span></label>
+        <select id="askArea"></select>
+      </div>
+      <div class="field">
+        <label for="askLabel">Piece <span class="optional">(optional)</span></label>
+        <select id="askLabel"></select>
+      </div>
+    </div>
+    <div class="field">
+      <label for="askMsg">Message</label>
+      <textarea id="askMsg" rows="4"></textarea>
+    </div>
+    <div class="field">
+      <span class="field-label">Photo <span class="optional">(optional)</span></span>
+      <label class="photo-pick" id="askPick">
+        <input type="file" accept="image/*" id="askPhoto" class="sr-only">
+        <span id="askPickText">Add a photo</span>
+      </label>
+      <img id="askPreview" class="photo-preview" alt="Your photo" hidden>
+      <div class="photo-actions" id="askPhotoActions" hidden>
+        <button type="button" class="linkish" id="askRemove">Remove photo</button>
+      </div>
+    </div>
+    <div class="field" id="askNameField"></div>
+    <section id="answers" hidden>
+      <h3>Answered questions</h3>
+      <ul class="qa" id="answerList"></ul>
+    </section>
+  </div>
+  <div class="sheet-foot">
+    <p class="hint" id="askHint">Sign in and write a message to send.</p>
+    <button type="button" class="btn" id="askSend" disabled>Send</button>
+  </div>
+</dialog>
+
+<!-- Safety -->
+<dialog id="safety" class="sheet" aria-labelledby="safetyTitle">
+  <div class="sheet-head">
+    <h2 id="safetyTitle">Shop safety</h2>
+    <button type="button" class="icon-btn" data-close aria-label="Close">×</button>
+  </div>
+  <div class="sheet-body" id="safetyBody"></div>
+  <div class="sheet-foot">
+    <p class="hint" id="safetyHint">Check every item and sign in to check in.</p>
+    <button type="button" class="btn" id="safetySend" disabled>Check in</button>
+  </div>
+</dialog>
+
+<!-- Sign in / join -->
+<dialog id="auth" class="sheet" aria-labelledby="authTitle" style="max-height:none">
+  <div class="sheet-head">
+    <h2 id="authTitle">Sign in</h2>
+    <button type="button" class="icon-btn" data-close aria-label="Close">×</button>
+  </div>
+  <div class="sheet-body">
+    <p class="form-error" id="authError" hidden></p>
+    <div class="field" id="authTabs">
+      <div class="seg" role="radiogroup" aria-label="Sign in or join">
+        <label><input type="radio" name="authMode" value="in" checked><span>Sign in</span></label>
+        <label><input type="radio" name="authMode" value="new"><span>I'm new</span></label>
+      </div>
+    </div>
+    <div id="authBody"></div>
+  </div>
+  <div class="sheet-foot"><button type="button" class="btn" id="authGo" disabled>Sign in</button></div>
+</dialog>
+
+<!-- Count spare wood -->
+<dialog id="stock" class="sheet" aria-labelledby="stockTitle">
+  <div class="sheet-head">
+    <h2 id="stockTitle">Count spare wood</h2>
+    <button type="button" class="icon-btn" data-close aria-label="Close">×</button>
+  </div>
+  <div class="sheet-body">
+    <p class="form-error" id="stError" hidden></p>
+    <p style="margin-top:0">Count what's on the rack so the cut plan uses it before anything new gets bought.</p>
+    <div class="guide-box"><p>Measure the <strong>usable</strong> length: skip boards that are split, twisted, or badly bowed, and measure past any damaged end. Round down to the nearest 1/2". Group boards of about the same length together.</p></div>
+    <div class="field">
+      <label for="stSize">Size</label>
+      <select id="stSize"></select>
+      <p class="hint" id="stCurrent" style="margin-top:6px"></p>
+    </div>
+    <div class="field">
+      <span class="field-label" id="stModeLabel">This is</span>
+      <div class="seg" role="radiogroup" aria-labelledby="stModeLabel">
+        <label><input type="radio" name="stMode" value="replace" checked><span>A full recount</span></label>
+        <label><input type="radio" name="stMode" value="add"><span>More boards</span></label>
+      </div>
+      <p class="hint" style="margin-top:6px">A full recount replaces what's on file for this size. More boards adds to it, for a delivery or a pile someone found.</p>
+    </div>
+    <div class="field">
+      <span class="field-label">Lengths and counts</span>
+      <div id="stRows"></div>
+      <div class="stock-tools">
+        <button type="button" class="btn-quiet" id="stAddRow">Add another length</button>
+        <span id="stQuick" class="stock-quick">Quick add:
+          <button type="button" class="linkish" data-len="96">8' (96")</button>
+          <button type="button" class="linkish" data-len="120">10'</button>
+          <button type="button" class="linkish" data-len="144">12'</button>
+          <button type="button" class="linkish" data-len="92 5/8">Precut stud (92 5/8")</button>
+        </span>
+      </div>
+    </div>
+    <div class="field" id="stNameField"></div>
+  </div>
+  <div class="sheet-foot">
+    <p class="hint" id="stHint">Add at least one length and count.</p>
+    <button type="button" class="btn" id="stSave" disabled>Save count</button>
+  </div>
+</dialog>
+
+<!-- Guide -->
+<dialog id="guide" class="sheet" aria-labelledby="guideTitle">
+  <div class="sheet-head">
+    <h2 id="guideTitle">How to label and bundle</h2>
+    <button type="button" class="icon-btn" data-close aria-label="Close">×</button>
+  </div>
+  <div class="sheet-body" id="guideBody"></div>
+  <div class="sheet-foot">
+    <p class="hint">Questions about a cut? Use Message leadership.</p>
+    <button type="button" class="btn" data-close>Got it</button>
+  </div>
+</dialog>
+
+<script src="assets/config.js"></script>
+<script src="assets/demo-data.js"></script>
+<script src="assets/planner.js"></script>
+<script src="assets/common.js"></script>
+<script src="assets/crew.js"></script>
+</body>
+</html>
