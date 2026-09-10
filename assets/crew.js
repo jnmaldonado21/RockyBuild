@@ -604,7 +604,7 @@
     $('authTabs').hidden = !!newPin;
     document.querySelectorAll('input[name="authMode"]').forEach(r => { r.checked = r.value === authMode; });
     if (newPin) {
-      $('authBody').innerHTML = `<p style="margin-top:0">Welcome, <strong>${C.esc(meName())}</strong>. Your PIN is:</p>
+      $('authBody').innerHTML = `<p style="margin-top:0">Welcome to ${C.esc(C.CFG.appName || 'SawHorse')}, <strong>${C.esc(meName())}</strong>. Your PIN is:</p>
         <p class="big-pin" aria-label="Your PIN is ${newPin.split('').join(' ')}">${C.esc(newPin)}</p>
         <p><strong>Write it down or take a screenshot now.</strong> This phone remembers you, but you'll need the PIN on any other phone or if you sign out. If you forget it, the shop lead can give you a new one.</p>`;
       $('authGo').textContent = 'Continue';
@@ -949,7 +949,10 @@
   function openGuide() { if ($('tour').open) $('tour').close(); $('guideBody').innerHTML = guideHTML(); $('guide').showModal(); }
 
   /* ================= First-run tour: Tackle, Track, Complete ================= */
-  const APP = C.CFG.appName, SHORT = C.CFG.appShort;
+  const APP = C.CFG.appName || 'SawHorse', TAGLINE = C.CFG.appTagline || 'Tackle, Track, Complete';
+  const BRAND_MARK = `<svg class="brand-mark" viewBox="0 0 64 48" aria-hidden="true" focusable="false"><g stroke-linecap="round" fill="none" stroke="currentColor"><path d="M19 16 L15 43 M45 16 L49 43" stroke-width="4.5" opacity="0.5"/><path d="M14 16 L6 44 M50 16 L58 44" stroke-width="6"/><path d="M10 32 H54" stroke-width="4.5"/></g><rect x="2" y="5" width="60" height="12" rx="2.5" fill="#F6C21C"/><path d="M8 5v4.5M14 5v2.8M20 5v4.5M26 5v2.8M32 5v4.5M38 5v2.8M44 5v4.5M50 5v2.8M56 5v4.5" stroke="#1C232B" stroke-width="1.6"/></svg>`;
+  // If an old index.html is paired with this file, skip the tour instead of breaking the page.
+  const TOUR_OK = ['tour', 'openTour', 'tourBody', 'tourNext', 'tourBack', 'tourSkip', 'tourDots', 'tourCount'].every(id => $(id));
   let tourAt = 0;
 
   function tourSlides() {
@@ -958,9 +961,10 @@
     const swatches = areas.map(a => `<span class="mock-swatch">${C.swatch(S.tape[a], 'lg')}<span>${C.esc(a)}</span></span>`).join('');
     const red = C.tapeHex(S.tape[areas[0]] || 'Red');
     return [
-      { title: `First time using ${APP} (${SHORT})?`,
-        body: `Here's a quick tour of how the app works: how to pick up a task, keep track of it, and mark it complete. It takes about a minute.`,
-        art: `<div class="mock-wordmark"><span>Tackle</span><span>Track</span><span>Complete</span></div>` },
+      { title: `First time using ${APP}?`,
+        body: `${APP} keeps the whole crew on the same page. <strong>Tackle</strong> a task, <strong>Track</strong> it as you go, and <strong>Complete</strong> it with a photo. This quick tour takes about a minute.`,
+        art: `<div class="mock-lockup"><div class="brand-row">${BRAND_MARK}<span class="brand-name">${C.esc(APP)}</span></div>
+          <div class="mock-tagline">${TAGLINE.split(/,\s*/).map(w => `<span>${C.esc(w)}</span>`).join('')}</div></div>` },
       { title: 'Sign in once',
         body: `Tap <strong>Sign in or join the crew</strong>, then <strong>I'm new</strong>, and enter your name. You'll get a 4-digit PIN. Screenshot it; you'll need it on any other phone. This phone remembers you.`,
         art: `<div class="mock-stack"><p class="mock-line">Welcome, <strong>Sam</strong>. Your PIN is:</p><span class="big-pin mock-pin">4821</span></div>` },
@@ -990,7 +994,7 @@
         body: `Set the line to <strong>Need to Purchase</strong> so leadership knows what to buy. For anything else, tap <strong>Message leadership</strong>. Answers show up there for the whole crew.`,
         art: `<div class="mock-row"><span class="pill s-buy mock-big-pill">Need to Purchase</span><span class="btn-quiet mock-quiet">Message leadership</span></div>` },
       { title: 'Safety first, then go',
-        body: `Each day the app offers a one-minute safety check-in: glasses on, hearing protection in, vacuum running, no gloves at the saw. You can replay this tour anytime from <strong>How to use ${SHORT}</strong>.`,
+        body: `Each day ${APP} offers a one-minute safety check-in: glasses on, hearing protection in, vacuum running, no gloves at the saw. Then you're ready to ${C.esc(TAGLINE.replace(/,\s*([^,]*)$/, ', and $1').toLowerCase())}. You can replay this tour anytime from <strong>How to use ${APP}</strong>.`,
         art: `<ul class="checklist mock-check"><li><label><input type="checkbox" checked disabled><span><strong>Safety glasses on</strong></span></label></li>
           <li><label><input type="checkbox" checked disabled><span><strong>Hearing protection in</strong></span></label></li>
           <li><label><input type="checkbox" checked disabled><span><strong>No gloves at the saw</strong></span></label></li></ul>` }
@@ -1027,40 +1031,42 @@
   }
   function tourGo(i) { tourAt = i; renderTour(); }
 
-  $('openTour').addEventListener('click', openTour);
-  $('tourSkip').addEventListener('click', closeTour);
-  $('tourBack').addEventListener('click', () => tourGo(tourAt - 1));
-  $('tourNext').addEventListener('click', () => {
-    if (tourAt < tourSlides().length - 1) return tourGo(tourAt + 1);
-    closeTour();
-    if (!me()) openAuth('');
-  });
-  $('tourDots').addEventListener('click', e => {
-    const b = e.target.closest('[data-go]');
-    if (!b) return;
-    tourGo(+b.dataset.go);
-    const cur = $('tourDots').querySelector('[aria-current]'); if (cur) cur.focus();
-  });
-  $('tour').addEventListener('close', () => C.store.set('tourSeen', true));
-  document.addEventListener('keydown', e => {
-    if (!$('tour').open || e.target.matches('input, select, textarea')) return;
-    if (e.key === 'ArrowRight') { e.preventDefault(); if (tourAt < tourSlides().length - 1) tourGo(tourAt + 1); }
-    if (e.key === 'ArrowLeft') { e.preventDefault(); if (tourAt > 0) tourGo(tourAt - 1); }
-  });
-  // Swipe left/right on phones
-  let swipeX = null;
-  $('tourBody').addEventListener('pointerdown', e => { swipeX = e.clientX; });
-  $('tourBody').addEventListener('pointerup', e => {
-    if (swipeX === null) return;
-    const dx = e.clientX - swipeX; swipeX = null;
-    if (Math.abs(dx) < 50) return;
-    if (dx < 0 && tourAt < tourSlides().length - 1) tourGo(tourAt + 1);
-    if (dx > 0 && tourAt > 0) tourGo(tourAt - 1);
-  });
+  if (TOUR_OK) {
+    $('openTour').addEventListener('click', openTour);
+    $('tourSkip').addEventListener('click', closeTour);
+    $('tourBack').addEventListener('click', () => tourGo(tourAt - 1));
+    $('tourNext').addEventListener('click', () => {
+      if (tourAt < tourSlides().length - 1) return tourGo(tourAt + 1);
+      closeTour();
+      if (!me()) openAuth('');
+    });
+    $('tourDots').addEventListener('click', e => {
+      const b = e.target.closest('[data-go]');
+      if (!b) return;
+      tourGo(+b.dataset.go);
+      const cur = $('tourDots').querySelector('[aria-current]'); if (cur) cur.focus();
+    });
+    $('tour').addEventListener('close', () => C.store.set('tourSeen', true));
+    document.addEventListener('keydown', e => {
+      if (!$('tour').open || e.target.matches('input, select, textarea')) return;
+      if (e.key === 'ArrowRight') { e.preventDefault(); if (tourAt < tourSlides().length - 1) tourGo(tourAt + 1); }
+      if (e.key === 'ArrowLeft') { e.preventDefault(); if (tourAt > 0) tourGo(tourAt - 1); }
+    });
+    // Swipe left/right on phones
+    let swipeX = null;
+    $('tourBody').addEventListener('pointerdown', e => { swipeX = e.clientX; });
+    $('tourBody').addEventListener('pointerup', e => {
+      if (swipeX === null) return;
+      const dx = e.clientX - swipeX; swipeX = null;
+      if (Math.abs(dx) < 50) return;
+      if (dx < 0 && tourAt < tourSlides().length - 1) tourGo(tourAt + 1);
+      if (dx > 0 && tourAt > 0) tourGo(tourAt - 1);
+    });
+  }
 
   // First visit on this device: show the tour, unless the page was opened for something else (like the saw-station sign).
   function maybeFirstTour() {
-    if (C.store.get('tourSeen', false)) return;
+    if (!TOUR_OK || C.store.get('tourSeen', false)) return;
     if (decodeURIComponent(location.hash.slice(1)) === 'safety') return;
     if (document.querySelector('dialog[open]')) return;
     openTour();
@@ -1284,8 +1290,8 @@
   /* ================= Dialog plumbing + start ================= */
   document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => b.closest('dialog').close()));
 
-  document.title = C.CFG.title;
-  $('title').textContent = C.CFG.title;
+  document.title = `${C.projectTitle()} | ${C.CFG.appName || 'SawHorse'}`;
+  $('title').textContent = C.projectTitle();
   window.addEventListener('beforeunload', e => { if (staged.size) { e.preventDefault(); e.returnValue = ''; } });
   document.addEventListener('visibilitychange', () => { if (!document.hidden && !busy) load(); });
   setInterval(() => { if (!document.hidden && !busy) load(); }, Math.max(10, C.CFG.pollSeconds) * 1000);
