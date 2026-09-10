@@ -1,4 +1,6 @@
-# Cut list tracker
+# SawHorse
+
+**Tackle, Track, Complete.** Crew coordination for build shops: cut lists, claims, photo sign-offs, cut plans, and assembly readiness.
 
 Three pages for the build, hosted free on GitHub Pages, with a Google Sheet as the shared database.
 
@@ -78,10 +80,17 @@ The first time someone opens the crew page on a device, a short tour explains th
 - **Getting around:** people can move through it with Next and Back, the dots, swiping on a phone, or the arrow keys.
 - **Skipping:** anyone can skip it.
 - **Finishing:** the last slide opens sign-in if they haven't joined yet.
-- **Replaying:** **How to use TTC** at the top of the page replays it anytime.
+- **Replaying:** **How to use SawHorse** at the top of the page replays it anytime.
 - **The saw-station sign:** scanning that sign opens the safety check-in instead of the tour.
 
-The app name comes from `appName` and `appShort`, which default to "Tackle, Track, Complete" and "TTC". To change them, add either one to `config.js`.
+### Branding
+
+- **Product name:** SawHorse. The tagline is "Tackle, Track, Complete."
+- **Where the brand appears:** a dark bar at the top of every page, the browser-tab icon, the tour, and a small mark on each printed sign.
+- **The mark:** a sawhorse whose top rail is a tape measure.
+- **Fonts:** Archivo for the brand and headings, Barlow for body text, and Barlow Condensed for numbers and labels.
+- **`title` in `config.js` is the project name** (for example, `'Bourbon & Bone'`), not the product name. It shows as the page heading under the brand bar. If `title` is set to "SawHorse" or the tagline, the page shows "Cut list" instead, so the name doesn't appear twice.
+- **Renaming:** `appName` and `appTagline` can be overridden in `config.js`.
 
 ### Crew sign-in
 
