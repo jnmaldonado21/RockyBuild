@@ -17,6 +17,7 @@
   </div>
   <p class="who-line" id="whoLine"></p>
   <div class="top-actions">
+    <button type="button" class="btn-quiet" id="openTour">How to use TTC</button>
     <button type="button" class="btn-quiet" id="openGuide">How to label and bundle</button>
     <button type="button" class="btn-quiet" id="openSafety">Shop safety</button>
     <button type="button" class="btn-quiet" id="openAsk">Message leadership</button>
@@ -240,6 +241,20 @@
   <div class="sheet-foot">
     <p class="hint" id="stHint">Add at least one length and count.</p>
     <button type="button" class="btn" id="stSave" disabled>Save count</button>
+  </div>
+</dialog>
+
+<!-- First-run tour -->
+<dialog id="tour" class="sheet tour" aria-labelledby="tourTitle" aria-roledescription="carousel">
+  <div class="sheet-head">
+    <p class="tour-count" id="tourCount" aria-live="polite"></p>
+    <button type="button" class="linkish" id="tourSkip">Skip tour</button>
+  </div>
+  <div class="sheet-body tour-body" id="tourBody"></div>
+  <div class="sheet-foot tour-foot">
+    <button type="button" class="btn-quiet" id="tourBack">Back</button>
+    <div class="tour-dots" id="tourDots" role="group" aria-label="Choose a slide"></div>
+    <button type="button" class="btn" id="tourNext">Next</button>
   </div>
 </dialog>
 
