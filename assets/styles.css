@@ -624,3 +624,14 @@ dialog.emergency-sheet .sheet-head h2 { color: var(--buy-text); }
   .brand-action.emergency { padding: 6px 11px; }
   .call-911-num { font-size: 34px; }
 }
+
+/* ---------- Leadership gate ---------- */
+.gate { display: flex; justify-content: center; padding: 48px 16px 80px; }
+.gate-card { width: min(440px, 100%); background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 24px; }
+.gate-card h2 { margin: 0 0 8px; }
+.gate-card .hint { margin-bottom: 18px; }
+.gate-actions { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.gate-actions .btn { min-width: 120px; }
+.gate-foot { margin: 18px 0 0; padding-top: 14px; border-top: 1px solid var(--line); }
+.crew-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.crew-actions .btn-quiet { min-height: 36px; padding: 6px 12px; font-size: 14px; }
