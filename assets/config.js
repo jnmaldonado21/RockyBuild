@@ -18,12 +18,20 @@ window.CUT_CONFIG = {
   maxBundle: 10,
 
   // Saw blade kerf in inches, used for the lumber estimate.
-  kerf: 0.125
-};
+  kerf: 0.125,
+
+  // Emergency contacts, shown when someone taps Emergency on the crew page.
+  // Order matters: put the person to call first at the top.
+  // "tel" is what actually gets dialed; digits, +, -, ( ) and spaces are fine.
+  // A contact with no number is skipped. Leave the list empty to hide the button.
   emergencyContacts: [
-    { name: 'Jay Figueroa',  role: 'Co-director',      tel: '+1 (254) 813-8239' },
+    { name: 'Jay Figueroa',           role: 'Co-director',      tel: '+1 (254) 813-8239' },
     { name: 'Kaydee Free-Maldonado',  role: 'Co-director',      tel: '+1 (806) 773-3543' },
-    { name: 'Nolan Maldonado',  role: 'Set designer',     tel: '+1 (254) 239-9040' },
-    { name: 'Adrienne',  role: 'Theater director', tel: '' }
+    { name: 'Nolan Maldonado',        role: 'Set designer',     tel: '+1 (254) 239-9040' },
+    { name: 'Adrienne',               role: 'Theater director', tel: '' }
   ],
-  shopAddress: '',
+
+  // Where the shop is, shown on the emergency panel so callers can give an address.
+  // Leave blank to hide it.
+  shopAddress: ''
+};
