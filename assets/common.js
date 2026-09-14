@@ -146,7 +146,7 @@
                     units: s.units || [], claims: (s.claims || []).filter(c => new Date(c.since).getTime() > cutoff), serverTime: new Date().toISOString() };
       if (view === 'lead') {
         out.lumber = s.lumber; out.log = s.log; out.messages = s.messages; out.safety = s.safety || [];
-        out.crewInfo = (s.crew || []).map(c => ({ name: c.name, joined: c.joined, active: c.active, hasPin: !!c.pin }));
+        out.crewInfo = (s.crew || []).map(c => ({ name: c.name, joined: c.joined, active: c.active, leader: !!c.leader, hasPin: !!c.pin }));
       }
       else out.messages = s.messages.filter(m => m.type === 'Question' && m.status === 'Answered' && m.reply);
       return clone(out);
@@ -164,9 +164,35 @@
         this.save(s);
         return { ok: true, name, userPin: pin };
       }
+      const MASTER = '1234';
+      const leaderCheck = () => {
+        const given = String(p.leadPin || p.pin || '').trim();
+        if (given) return given === MASTER
+          ? { ok: true, name: p.name || 'Leadership', master: true }
+          : { ok: false, auth: true, error: 'That master PIN is not right. In demo mode it\'s 1234.' };
+        const u = s.crew.find(c => same(c.name, p.name || ''));
+        if (!p.name || !p.userPin) return { ok: false, auth: true, error: 'Sign in as a leader to open this page.' };
+        if (!u || u.pin !== String(p.userPin)) return { ok: false, auth: true, error: `That PIN doesn't match ${p.name}. In demo mode, the sample crew's PINs are 1234.` };
+        if (!u.leader) return { ok: false, auth: true, error: `${u.name} is not set up as leadership. Ask someone who is, or use the master PIN (1234 in demo).` };
+        return { ok: true, name: u.name, master: false };
+      };
+      if (['leadView', 'leadSignin', 'setLeader', 'resetPin', 'reply', 'sendSummary'].includes(p.action)) {
+        const who = leaderCheck();
+        if (!who.ok) return who;
+        if (p.action === 'leadSignin') return who;
+        if (p.action === 'leadView') return clone(this.view('lead'));
+        if (p.action === 'setLeader') {
+          const t = s.crew.find(c => same(c.name, p.target));
+          if (!t) return { ok: false, error: `No one named ${p.target} is on the crew list.` };
+          if (!p.leader && s.crew.filter(c => c.leader).length <= 1 && t.leader) return { ok: false, error: 'That would leave nobody as leadership. Make someone else a leader first.' };
+          if (!p.leader && !who.master && same(t.name, who.name)) return { ok: false, error: "You can't remove your own leadership. Ask another leader to do it." };
+          t.leader = !!p.leader;
+          this.save(s);
+          return { ok: true, name: t.name, leader: t.leader };
+        }
+      }
       if (p.action === 'resetPin') {
-        if (String(p.pin) !== '1234') return { ok: false, error: 'That PIN is not right. In demo mode the PIN is 1234.' };
-        const c = s.crew.find(x => same(x.name, p.name));
+        const c = s.crew.find(x => same(x.name, p.target || p.resetName));
         if (!c) return { ok: false, error: 'No one by that name is on the crew list.' };
         c.pin = String(Math.floor(1000 + Math.random() * 9000));
         this.save(s);
@@ -246,17 +272,13 @@
         return { ok: true };
       }
       if (p.action === 'sendSummary') {
-        if (String(p.pin) !== '1234') return { ok: false, error: 'That PIN is not right. In demo mode the PIN is 1234.' };
         return { ok: false, error: "Demo mode doesn't send email. Once the sheet is connected, this emails the summary to the address in the Settings tab." };
       }
-      if (p.action === 'checkPin' || p.action === 'reply') {
-        if (String(p.pin) !== '1234') return { ok: false, error: 'That PIN is not right. In demo mode the PIN is 1234.' };
-        if (p.action === 'reply') {
-          const m = s.messages.find(x => x.id === p.id);
-          if (!m) return { ok: false, error: 'That message no longer exists.' };
-          Object.assign(m, { reply: p.reply || '', status: p.reply ? 'Answered' : 'Closed', repliedBy: p.name || 'Leadership', repliedAt: now });
-          this.save(s);
-        }
+      if (p.action === 'reply') {
+        const m = s.messages.find(x => x.id === p.id);
+        if (!m) return { ok: false, error: 'That message no longer exists.' };
+        Object.assign(m, { reply: p.reply || '', status: p.reply ? 'Answered' : 'Closed', repliedBy: p.name || 'Leadership', repliedAt: now });
+        this.save(s);
         return { ok: true };
       }
       return { ok: false, error: 'Unknown action' };
@@ -330,7 +352,7 @@
   const today = () => { const d = new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); };
 
   window.Cut = {
-    CFG, DEMO, STATUSES, CLS, normStatus, esc, clone, store, api, today, projectTitle,
+    CFG, DEMO, STATUSES, CLS, normStatus, normalizeLead: normalize, esc, clone, store, api, today, projectTitle,
     unitStatus: (sheets, units, stateOf) => P.unitStatus(sheets, units, stateOf), UNIT_STAGES: P.UNIT_STAGES,
     effDone, leftToCut, pieceRange, bundlesFor, parseInches, fmtIn, lumberFor, lumberReport, piecesLeftFor, isSheetGood,
     tapeHex, inkOn, swatch, timeAgo, compressImage, photoThumb, photoLink,
