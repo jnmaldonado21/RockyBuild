@@ -21,9 +21,9 @@ window.CUT_CONFIG = {
   kerf: 0.125
 };
   emergencyContacts: [
-    { name: '',  role: 'Co-director',      tel: '' },
-    { name: '',  role: 'Co-director',      tel: '' },
-    { name: '',  role: 'Set designer',     tel: '' },
-    { name: '',  role: 'Theater director', tel: '' }
+    { name: 'Jay Figueroa',  role: 'Co-director',      tel: '+1 (254) 813-8239' },
+    { name: 'Kaydee Free-Maldonado',  role: 'Co-director',      tel: '+1 (806) 773-3543' },
+    { name: 'Nolan Maldonado',  role: 'Set designer',     tel: '+1 (254) 239-9040' },
+    { name: 'Adrienne',  role: 'Theater director', tel: '' }
   ],
   shopAddress: '',
