@@ -20,3 +20,10 @@ window.CUT_CONFIG = {
   // Saw blade kerf in inches, used for the lumber estimate.
   kerf: 0.125
 };
+  emergencyContacts: [
+    { name: '',  role: 'Co-director',      tel: '' },
+    { name: '',  role: 'Co-director',      tel: '' },
+    { name: '',  role: 'Set designer',     tel: '' },
+    { name: '',  role: 'Theater director', tel: '' }
+  ],
+  shopAddress: '',
