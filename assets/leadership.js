@@ -3,14 +3,24 @@
   const $ = id => document.getElementById(id);
   const L = {
     data: null, lastError: '', logShown: 15,
-    pin: C.store.get('pin', ''), pinOk: false, leadName: C.store.get('leadName', ''),
-    drafts: {}, open: new Set(), busy: false
+    auth: C.store.get('leadAuth', null),   // { name, userPin } or { name, leadPin }
+    drafts: {}, open: new Set(), busy: false, gateMode: 'user'
   };
+  const authed = () => !!(L.auth && (L.auth.userPin || L.auth.leadPin));
+  const whoName = () => (L.auth && L.auth.name) || 'Leadership';
+
+  // Every leadership request carries credentials; the sheet decides what comes back.
+  const post = (payload) => C.api.post(Object.assign({}, L.auth || {}, payload));
 
   async function load() {
+    if (!authed()) return showGate();
     try {
-      L.data = await C.api.get('lead');
+      const res = await post({ action: 'leadView' });
+      if (res && res.auth) { signOut(res.error); return; }
+      if (!res || !res.ok) throw new Error((res && res.error) || 'Unexpected response');
+      L.data = C.normalizeLead ? C.normalizeLead(res) : res;
       L.lastError = '';
+      showPage();
       render();
     } catch (err) {
       console.error(err);
@@ -19,11 +29,95 @@
     updateSync();
   }
 
+  /* ---------- Gate ---------- */
+  function showGate(msg) {
+    $('gate').hidden = false;
+    $('leadMain').hidden = true;
+    $('leadSignOut').hidden = true;
+    document.querySelectorAll('.lead-only').forEach(el => { el.hidden = true; });
+    C.setSync($('sync'), 'busy', 'Not signed in');
+    renderGate();
+    showError('gateError', msg || '');
+  }
+  function showPage() {
+    $('gate').hidden = true;
+    $('leadMain').hidden = false;
+    $('leadSignOut').hidden = false;
+    document.querySelectorAll('.lead-only').forEach(el => { el.hidden = el.id === 'sheetLink' && !C.CFG.sheetUrl; });
+    $('leadSignOut').textContent = `Sign out (${whoName()})`;
+  }
+  function signOut(msg) {
+    L.auth = null; L.data = null;
+    C.store.del('leadAuth');
+    showGate(msg);
+  }
+  function showError(id, msg) { const el = $(id); el.textContent = msg || ''; el.hidden = !msg; }
+
+  function renderGate() {
+    const names = C.store.get('leadNames', []);
+    const last = C.store.get('leadLastName', '');
+    $('gateBody').innerHTML = L.gateMode === 'user'
+      ? `<div class="field"><label for="gateName">Your name</label>
+           ${names.length
+             ? `<select id="gateName"><option value="">Choose your name…</option>${names.map(n => `<option value="${C.esc(n)}" ${n === last ? 'selected' : ''}>${C.esc(n)}</option>`).join('')}</select>`
+             : `<input type="text" id="gateName" autocomplete="name" placeholder="First and last name" value="${C.esc(last)}">`}
+         </div>
+         <div class="field"><label for="gatePin">Your 4-digit PIN</label>
+           <input type="password" id="gatePin" class="pin-input" inputmode="numeric" maxlength="4" autocomplete="off"></div>`
+      : `<div class="field"><label for="gateName">Your name</label>
+           <input type="text" id="gateName" autocomplete="name" placeholder="So replies are signed" value="${C.esc(C.store.get('leadLastName', ''))}"></div>
+         <div class="field"><label for="gatePin">Master PIN</label>
+           <input type="password" id="gatePin" inputmode="numeric" autocomplete="off"></div>
+         <p class="hint">The master PIN is in Apps Script under Project Settings, Script properties, LEAD_PIN.${C.DEMO ? ' In demo mode it\'s 1234.' : ''}</p>`;
+    $('gateToggle').textContent = L.gateMode === 'user' ? 'Use the master PIN instead' : 'Sign in with my name and PIN';
+    $('gateGo').textContent = 'Sign in';
+    updateGateButton();
+  }
+  function updateGateButton() {
+    const name = ($('gateName') || {}).value || '';
+    const pin = ($('gatePin') || {}).value || '';
+    $('gateGo').disabled = L.busy || !name.trim() || (L.gateMode === 'user' ? !/^\d{4}$/.test(pin.trim()) : !pin.trim());
+  }
+  $('gateBody').addEventListener('input', updateGateButton);
+  $('gateBody').addEventListener('change', updateGateButton);
+  $('gateBody').addEventListener('keydown', e => { if (e.key === 'Enter' && !$('gateGo').disabled) $('gateGo').click(); });
+  $('gateToggle').addEventListener('click', () => {
+    L.gateMode = L.gateMode === 'user' ? 'master' : 'user';
+    showError('gateError', '');
+    renderGate();
+    const f = $('gateBody').querySelector('input, select'); if (f) f.focus();
+  });
+  $('gateGo').addEventListener('click', async () => {
+    if (L.busy) return;
+    const name = $('gateName').value.trim().replace(/\s+/g, ' ');
+    const pin = $('gatePin').value.trim();
+    const cred = L.gateMode === 'user' ? { name, userPin: pin } : { name, leadPin: pin };
+    L.busy = true; updateGateButton(); showError('gateError', '');
+    try {
+      const res = await C.api.post(Object.assign({ action: 'leadSignin' }, cred));
+      if (!res || !res.ok) throw Object.assign(new Error((res && res.error) || 'That sign-in was refused.'), { shown: true });
+      L.auth = Object.assign({}, cred, { name: res.name || name });
+      C.store.set('leadAuth', L.auth);
+      C.store.set('leadLastName', L.auth.name);
+      L.busy = false;
+      await load();
+      return;
+    } catch (err) {
+      showError('gateError', err.shown ? err.message : "Couldn't reach the sheet. Try again when you have signal.");
+    }
+    L.busy = false;
+    updateGateButton();
+  });
+  $('leadSignOut').addEventListener('click', () => {
+    if (confirm('Sign out of the leadership page on this device?')) signOut();
+  });
+
   function updateSync() {
     const el = $('sync');
     if (L.lastError) return C.setSync(el, 'err', L.lastError);
+    if (!authed()) return C.setSync(el, 'busy', 'Not signed in');
     if (!L.data) return C.setSync(el, 'busy', 'Loading…');
-    C.setSync(el, C.DEMO ? 'demo' : 'ok', C.DEMO ? 'Demo data' : `Updated ${new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`);
+    C.setSync(el, C.DEMO ? 'demo' : 'ok', (C.DEMO ? 'Demo data, ' : '') + `signed in as ${whoName()}`);
   }
 
   const cutsOf = sh => sh.rows.filter(r => r.type === 'cut');
@@ -186,30 +280,45 @@
   /* ---------- Crew and PIN resets ---------- */
   function renderCrew(d) {
     const crew = (d.crewInfo || []).slice().sort((a, b) => a.name.localeCompare(b.name));
+    C.store.set('leadNames', crew.filter(c => c.leader && c.active).map(c => c.name));
     const active = crew.filter(c => c.active).length;
     $('crewCount').textContent = crew.length ? `${active} active` : '';
     if (!crew.length) { $('crewList').innerHTML = '<p class="empty" style="margin:0">Nobody has joined yet.</p>'; return; }
-    $('crewList').innerHTML = `<div class="table-scroll"><table class="data"><thead><tr><th scope="col">Name</th><th scope="col">Joined</th><th scope="col">PIN</th></tr></thead><tbody>
+    $('crewList').innerHTML = `<div class="table-scroll"><table class="data"><thead><tr><th scope="col">Name</th><th scope="col">Joined</th><th scope="col">Role</th><th scope="col">Actions</th></tr></thead><tbody>
       ${crew.map(c => `<tr><th scope="row">${C.esc(c.name)}${c.active ? '' : '<small>Turned off</small>'}</th>
         <td>${c.joined ? C.esc(new Date(c.joined).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })) : '—'}</td>
-        <td>${L.pinOk ? `<button type="button" class="btn-quiet" data-reset="${C.esc(c.name)}" style="min-height:36px;padding:6px 12px">Reset PIN</button>` : '<small>Unlock with the leadership PIN to reset</small>'}
+        <td>${c.leader ? '<span class="pill s-tag">Leader</span>' : '<span class="when">Crew</span>'}</td>
+        <td class="crew-actions">
+          <button type="button" class="btn-quiet" data-leader="${C.esc(c.name)}" data-make="${c.leader ? 'no' : 'yes'}">${c.leader ? 'Remove leader' : 'Make leader'}</button>
+          <button type="button" class="btn-quiet" data-reset="${C.esc(c.name)}">Reset PIN</button>
           <span class="reset-result" data-for="${C.esc(c.name)}"></span></td></tr>`).join('')}
     </tbody></table></div>`;
   }
   $('crewList').addEventListener('click', async e => {
-    const name = e.target.dataset.reset;
-    if (!name) return;
-    if (!confirm(`Give ${name} a new PIN? Their old PIN stops working on every device.`)) return;
-    e.target.disabled = true;
+    const btn = e.target.closest('[data-reset], [data-leader]');
+    if (!btn) return;
+    const reset = btn.dataset.reset, name = reset || btn.dataset.leader;
+    const make = btn.dataset.make === 'yes';
+    if (reset && !confirm(`Give ${name} a new PIN? Their old PIN stops working on every device.`)) return;
+    if (!reset && !confirm(make
+      ? `Make ${name} a leader? They'll be able to open this page, reply to the crew, reset PINs, and make other leaders.`
+      : `Remove ${name} from leadership? They keep their crew account and can still sign off on work.`)) return;
+    btn.disabled = true;
     try {
-      const res = await C.api.post({ action: 'resetPin', pin: L.pin, name });
-      if (!res.ok) throw new Error(res.error);
-      const out = [...document.querySelectorAll('.reset-result')].find(x => x.dataset.for === name);
-      if (out) out.innerHTML = ` <strong class="big" style="margin-left:10px">${C.esc(res.userPin)}</strong> <small>Tell ${C.esc(name.split(' ')[0])} in person.</small>`;
+      const res = reset ? await post({ action: 'resetPin', target: name })
+                        : await post({ action: 'setLeader', target: name, leader: make });
+      if (!res.ok) throw new Error(res.error || 'That change was refused.');
+      if (reset) {
+        const out = [...document.querySelectorAll('.reset-result')].find(x => x.dataset.for === name);
+        if (out) out.innerHTML = ` <strong class="big" style="margin-left:10px">${C.esc(res.userPin)}</strong> <small>Tell ${C.esc(name.split(' ')[0])} in person.</small>`;
+      } else {
+        C.toast(make ? `${name} is now leadership. They open this page with their own name and PIN.` : `${name} is back to crew.`);
+        await load();
+      }
     } catch (err) {
-      C.toast(err.message || "Couldn't reset the PIN.");
+      C.toast(err.message || "Couldn't make that change.");
     }
-    e.target.disabled = false;
+    btn.disabled = false;
   });
 
   /* ---------- Safety ---------- */
@@ -240,20 +349,6 @@
   }
 
   /* ---------- Inbox ---------- */
-  function renderPinbar() {
-    if (L.pinOk) {
-      $('pinbar').innerHTML = `<p class="hint" style="margin:0">Replying as <strong>${C.esc(L.leadName || 'Leadership')}</strong>. <button type="button" class="linkish" id="lockBtn">Lock replies</button></p>`;
-      return;
-    }
-    $('pinbar').innerHTML = `<div class="pinbar">
-      <div class="field"><label for="leadName">Your name</label><input type="text" id="leadName" autocomplete="name" value="${C.esc(L.leadName)}"></div>
-      <div class="field"><label for="pinInput">Leadership PIN</label><input type="password" id="pinInput" inputmode="numeric" autocomplete="off"></div>
-      <button type="button" class="btn" id="unlockBtn">Unlock replies</button>
-      <p class="hint">Anyone with this page can read messages. The PIN is only needed to reply.${C.DEMO ? ' In demo mode the PIN is 1234.' : ''}</p>
-      <p class="form-error" id="pinError" hidden style="flex-basis:100%;margin:0"></p>
-    </div>`;
-  }
-
   function msgHTML(m) {
     const photo = m.photo ? `<a class="thumb" href="${C.esc(C.photoLink(m.photo) || C.photoThumb(m.photo, 1600))}" target="_blank" rel="noopener"><img src="${C.esc(C.photoThumb(m.photo))}" alt="Photo attached by ${C.esc(m.name)}" loading="lazy"></a>` : '';
     const about = [m.area, m.label].filter(Boolean).map(C.esc).join(', ');
@@ -264,7 +359,7 @@
       <p class="body">${C.esc(m.message)}</p>
       ${m.reply ? `<p class="reply"><strong>${C.esc(m.repliedBy || 'Leadership')}:</strong> ${C.esc(m.reply)}</p>` : ''}
       ${!open && !m.reply ? `<p class="when" style="margin-top:6px">Closed by ${C.esc(m.repliedBy || 'leadership')}</p>` : ''}
-      ${open && L.pinOk ? `<label class="sr-only" for="r-${C.esc(m.id)}">Reply to ${C.esc(m.name)}</label>
+      ${open ? `<label class="sr-only" for="r-${C.esc(m.id)}">Reply to ${C.esc(m.name)}</label>
         <textarea id="r-${C.esc(m.id)}" data-draft="${C.esc(m.id)}" placeholder="${m.type === 'Question' ? 'Write an answer. The whole crew will see it.' : 'Optional reply'}">${C.esc(L.drafts[m.id] || '')}</textarea>
         <div class="msg-actions"><button type="button" class="btn" data-reply="${C.esc(m.id)}">Send reply</button>
         <button type="button" class="btn-quiet" data-close-msg="${C.esc(m.id)}">${m.type === 'Question' ? 'Close without replying' : 'Mark as read'}</button></div>` : ''}
@@ -272,7 +367,6 @@
   }
 
   function renderInbox(d) {
-    renderPinbar();
     const msgs = d.messages || [];
     const open = msgs.filter(m => m.status === 'Open');
     const done = msgs.filter(m => m.status !== 'Open');
@@ -282,26 +376,6 @@
       (done.length ? `<details class="area-detail" style="margin-top:12px" ${L.open.has('__answered') ? 'open' : ''} data-key="__answered"><summary><span class="grow">Answered and closed</span><span class="when">${done.length}</span></summary>
         <ul class="feed" style="border:0;border-top:1px solid var(--line);border-radius:0">${done.map(msgHTML).join('')}</ul></details>` : '');
   }
-
-  $('pinbar').addEventListener('click', async e => {
-    if (e.target.id === 'lockBtn') { L.pinOk = false; L.pin = ''; C.store.del('pin'); renderInbox(L.data); renderCrew(L.data); return; }
-    if (e.target.id !== 'unlockBtn') return;
-    const pin = $('pinInput').value.trim();
-    const name = $('leadName').value.trim();
-    const err = $('pinError');
-    if (!name) { err.textContent = 'Add your name so the crew knows who answered.'; err.hidden = false; return; }
-    try {
-      const res = await C.api.post({ action: 'checkPin', pin });
-      if (!res.ok) throw new Error(res.error);
-      L.pin = pin; L.pinOk = true; L.leadName = name;
-      C.store.set('pin', pin); C.store.set('leadName', name);
-      renderInbox(L.data);
-      renderCrew(L.data);
-    } catch (e2) {
-      err.textContent = e2.message || "Couldn't check the PIN."; err.hidden = false;
-    }
-  });
-  $('pinbar').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'pinInput') $('unlockBtn').click(); });
 
   $('inbox').addEventListener('input', e => { if (e.target.dataset.draft) L.drafts[e.target.dataset.draft] = e.target.value; });
   $('inbox').addEventListener('click', async e => {
@@ -313,7 +387,7 @@
     if (replyId && !reply) { C.toast('Write a reply first, or close it without replying.'); return; }
     e.target.disabled = true;
     try {
-      const res = await C.api.post({ action: 'reply', pin: L.pin, id, reply, name: L.leadName });
+      const res = await post({ action: 'reply', id, reply });
       if (!res.ok) throw new Error(res.error);
       delete L.drafts[id];
       C.toast(replyId ? 'Reply sent. The crew can see it now.' : 'Closed.');
@@ -322,7 +396,6 @@
     } catch (err) {
       e.target.disabled = false;
       C.toast(err.message || "Couldn't send. Try again.");
-      if (/PIN/.test(err.message || '')) { L.pinOk = false; C.store.del('pin'); renderInbox(L.data); }
     }
   });
 
@@ -393,16 +466,10 @@
 
   /* ---------- Summary email ---------- */
   $('emailBtn').addEventListener('click', async () => {
-    if (!L.pinOk) {
-      C.toast('Unlock with your leadership PIN under Questions and notes first.');
-      const pin = document.getElementById('pinInput');
-      if (pin) { pin.scrollIntoView({ behavior: 'smooth', block: 'center' }); pin.focus({ preventScroll: true }); }
-      return;
-    }
     const btn = $('emailBtn');
     btn.disabled = true; btn.textContent = 'Sending…';
     try {
-      const res = await C.api.post({ action: 'sendSummary', pin: L.pin });
+      const res = await post({ action: 'sendSummary' });
       if (!res.ok) throw new Error(res.error);
       C.toast(`Summary sent to ${res.to}. Edit it and forward it to the directors.`);
     } catch (err) {
@@ -415,9 +482,8 @@
   const proj = /^cut list$/i.test(C.projectTitle('')) ? '' : C.projectTitle('');
   document.title = `${proj ? proj + ' build overview' : 'Build overview'} | ${C.CFG.appName || 'SawHorse'}`;
   $('title').textContent = proj ? proj + ' build overview' : 'Build overview';
-  if (C.CFG.sheetUrl) { $('sheetLink').href = C.CFG.sheetUrl; $('sheetLink').hidden = false; }
-  if (L.pin) C.api.post({ action: 'checkPin', pin: L.pin }).then(r => { L.pinOk = !!(r && r.ok); if (L.data) { renderInbox(L.data); renderCrew(L.data); } }).catch(() => {});
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });
-  setInterval(() => { if (!document.hidden) load(); }, Math.max(20, C.CFG.pollSeconds * 2) * 1000);
+  if (C.CFG.sheetUrl) $('sheetLink').href = C.CFG.sheetUrl;
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && authed()) load(); });
+  setInterval(() => { if (!document.hidden && authed()) load(); }, Math.max(20, C.CFG.pollSeconds * 2) * 1000);
   load();
 })();
