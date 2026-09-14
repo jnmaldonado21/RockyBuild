@@ -948,6 +948,47 @@
 
   function openGuide() { if ($('tour').open) $('tour').close(); $('guideBody').innerHTML = guideHTML(); $('guide').showModal(); }
 
+  /* ================= Emergency contacts ================= */
+  // Digits only for tel:, so "(979) 555-0134 x2" dials correctly. Keeps a leading +.
+  const telHref = v => {
+    const raw = String(v || '').trim();
+    const plus = raw.startsWith('+') ? '+' : '';
+    const parts = raw.replace(/^\+/, '').split(/\s*(?:ext\.?|x)\s*/i);
+    const num = plus + parts[0].replace(/[^\d]/g, '');
+    const ext = (parts[1] || '').replace(/[^\d]/g, '');
+    return num ? 'tel:' + num + (ext ? ',' + ext : '') : '';
+  };
+  const contacts = () => (C.CFG.emergencyContacts || []).filter(c => c && c.tel && telHref(c.tel));
+
+  function renderEmergency() {
+    const list = contacts();
+    const addr = String(C.CFG.shopAddress || '').trim();
+    $('emergencyBody').innerHTML = `
+      <a class="call-911" href="tel:911">
+        <span class="call-911-num">Call 911</span>
+        <span class="call-911-sub">Serious injury, fire, or anything you're unsure about</span>
+      </a>
+      ${addr ? `<div class="guide-box emergency-addr"><h3>Tell them where you are</h3><p>${C.esc(addr)}</p></div>` : ''}
+      <h3 class="emergency-heading">Then tell someone here</h3>
+      <ul class="call-list">${list.map(c => `<li><a href="${C.esc(telHref(c.tel))}">
+        <span class="call-who"><strong>${C.esc(c.name || c.role || 'Contact')}</strong>${c.name && c.role ? `<span>${C.esc(c.role)}</span>` : ''}</span>
+        <span class="call-num">${C.esc(c.tel)}</span></a></li>`).join('')}</ul>
+      <div class="guide-box"><h3>While you wait</h3><ul>
+        <li>Stop the saws and unplug them.</li>
+        <li>Don't move someone who fell or hit their head unless they're in danger where they are.</li>
+        <li>The first aid kit and fire extinguisher are by the shop entrance.</li>
+        <li>Once everyone's safe, tell leadership what happened through <strong>Message leadership</strong>.</li>
+      </ul></div>`;
+  }
+
+  function openEmergency() {
+    renderEmergency();
+    ['tour', 'auth', 'signoff', 'ask', 'guide', 'safety', 'stock'].forEach(id => { if ($(id) && $(id).open) $(id).close(); });
+    $('emergency').showModal();
+  }
+  $('openEmergency').hidden = !contacts().length;
+  $('openEmergency').addEventListener('click', openEmergency);
+
   /* ================= First-run tour: Tackle, Track, Complete ================= */
   const APP = C.CFG.appName || 'SawHorse', TAGLINE = C.CFG.appTagline || 'Tackle, Track, Complete';
   const BRAND_MARK = `<svg class="brand-mark" viewBox="0 0 64 48" aria-hidden="true" focusable="false"><g stroke-linecap="round" fill="none" stroke="currentColor"><path d="M19 16 L15 43 M45 16 L49 43" stroke-width="4.5" opacity="0.5"/><path d="M14 16 L6 44 M50 16 L58 44" stroke-width="6"/><path d="M10 32 H54" stroke-width="4.5"/></g><rect x="2" y="5" width="60" height="12" rx="2.5" fill="#F6C21C"/><path d="M8 5v4.5M14 5v2.8M20 5v4.5M26 5v2.8M32 5v4.5M38 5v2.8M44 5v4.5M50 5v2.8M56 5v4.5" stroke="#1C232B" stroke-width="1.6"/></svg>`;
@@ -994,7 +1035,7 @@
         body: `Set the line to <strong>Need to Purchase</strong> so leadership knows what to buy. For anything else, tap <strong>Message leadership</strong>. Answers show up there for the whole crew.`,
         art: `<div class="mock-row"><span class="pill s-buy mock-big-pill">Need to Purchase</span><span class="btn-quiet mock-quiet">Message leadership</span></div>` },
       { title: 'Safety first, then go',
-        body: `Each day ${APP} offers a one-minute safety check-in: glasses on, hearing protection in, vacuum running, no gloves at the saw. Then you're ready to ${C.esc(TAGLINE.replace(/,\s*([^,]*)$/, ', and $1').toLowerCase())}. You can replay this tour anytime from <strong>How to use ${APP}</strong>.`,
+        body: `Each day ${APP} offers a one-minute safety check-in: glasses on, hearing protection in, vacuum running, no gloves at the saw.${contacts().length ? ' If someone gets hurt, tap <strong>Emergency</strong> at the top for 911 and the people to call.' : ''} Then you're ready to ${C.esc(TAGLINE.replace(/,\s*([^,]*)$/, ', and $1').toLowerCase())}. You can replay this tour anytime from <strong>How to use ${APP}</strong>.`,
         art: `<ul class="checklist mock-check"><li><label><input type="checkbox" checked disabled><span><strong>Safety glasses on</strong></span></label></li>
           <li><label><input type="checkbox" checked disabled><span><strong>Hearing protection in</strong></span></label></li>
           <li><label><input type="checkbox" checked disabled><span><strong>No gloves at the saw</strong></span></label></li></ul>` }
