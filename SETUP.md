@@ -1,4 +1,4 @@
-# Setup guide
+# SawHorse setup guide
 
 About 45 minutes from start to a working site. You'll need:
 
@@ -34,7 +34,7 @@ Don't add any columns or tabs yourself. The script does that in Part 2.
 ### Paste in the code
 
 1. In the Google Sheet, choose **Extensions > Apps Script**. A new tab opens with a file called `Code.gs` containing `function myFunction() {}`.
-2. Click **Untitled project** at the top and rename it **Cut list tracker**.
+2. Click **Untitled project** at the top and rename it **SawHorse**.
 3. Select everything in `Code.gs` and delete it.
 4. Open `apps-script/Code.gs` from the repo in any text editor, copy **all** of it (about 1,350 lines), and paste it in.
 5. Save with **Ctrl+S** (Cmd+S on a Mac).
@@ -42,14 +42,14 @@ Don't add any columns or tabs yourself. The script does that in Part 2.
 ### Run setup once
 
 6. In the toolbar, find the function dropdown (it may say `doGet`). Choose **setup**, then click **Run**.
-7. Google asks for permission. Click **Review permissions**, pick your account, and you'll see **"Google hasn't verified this app."** That warning is normal for a script you wrote yourself. Click **Advanced**, then **Go to Cut list tracker (unsafe)**, then **Allow**. The script asks for four things:
+7. Google asks for permission. Click **Review permissions**, pick your account, and you'll see **"Google hasn't verified this app."** That warning is normal for a script you wrote yourself. Click **Advanced**, then **Go to SawHorse (unsafe)**, then **Allow**. The script asks for four things:
    - **This spreadsheet:** to read cuts and write statuses.
    - **Google Drive:** to store sign-off photos in a "Cut list photos" folder.
    - **Send email as you:** for the daily summary, which goes only to you.
    - **Run on a schedule:** so the summary sends itself each evening.
 8. When the run finishes, the **Execution log** at the bottom shows:
    `Setup complete. Leadership PIN: 123456`
-   Copy the PIN. You and the directors use it to reply to crew questions and to send the summary on demand. To change it later, go to **Project Settings** (gear icon) **> Script properties > LEAD_PIN**.
+   Copy it. This is the **master PIN**: it opens the leadership page the first time, before anyone has been made a leader, and it's your way back in if leaders lose access. To change it later, go to **Project Settings** (gear icon) **> Script properties > LEAD_PIN**.
 
 ### Check the new tabs
 
@@ -85,7 +85,7 @@ Don't add any columns or tabs yourself. The script does that in Part 2.
    ```js
    window.CUT_CONFIG = {
      apiUrl: 'https://script.google.com/macros/s/PASTE-YOURS-HERE/exec',
-     title: 'Bourbon & Bone',
+     title: 'Bourbon & Bone',   // your project's name; SawHorse branding is built in
      sheetUrl: 'https://docs.google.com/spreadsheets/d/PASTE-YOURS-HERE/edit',
      pollSeconds: 20,
      maxBundle: 10,
@@ -116,7 +116,7 @@ Don't add any columns or tabs yourself. The script does that in Part 2.
    cd cut-tracker
    git init
    git add .
-   git commit -m "Cut list tracker"
+   git commit -m "SawHorse"
    git branch -M main
    git remote add origin https://github.com/YOUR-USERNAME/bourbon-bone-build.git
    git push -u origin main
@@ -147,11 +147,13 @@ Run through these on your phone. The crew page's status line should say **Up to 
    - Take a photo of anything and save. The form already knows who you are.
    - In the sheet, line C should now read *In Progress, 1*, with your name, the time, and a photo link. The **Log** tab gets a row, and the photo appears in Drive under **Cut list photos**.
 3. **Claim:** Tap **I'm on it** on any line. On the leadership page, you should appear under **Who's working on what** within 20 seconds.
-4. **Photos and replies:** On the leadership page, enter your name and PIN to unlock replies. Your test sign-off should show with a photo thumbnail. If the thumbnail is blank, see Troubleshooting.
+4. **Leadership access:** Open the leadership page. It should show a sign-in card, not the build. Choose **Use the master PIN instead**, enter your name and the master PIN, and sign in. Your test sign-off should show with a photo thumbnail. If the thumbnail is blank, see Troubleshooting.
+   Then scroll to **Crew**, click **Make leader** next to your name, sign out, and sign back in with your own name and 4-digit PIN. From now on, you don't need the master PIN.
 5. **Email:** Click **Email me a summary** and check your inbox.
-6. **Spare wood:** On the crew page, go to **Cut plan > Count spare wood** and enter one test count. The plan should add a "From spare wood" section.
+6. **Emergency:** Tap the red **Emergency** button and check that each name dials the right person. Test this on an actual phone, not a computer.
+7. **Spare wood:** On the crew page, go to **Cut plan > Count spare wood** and enter one test count. The plan should add a "From spare wood" section.
 
-7. **PIN reset:** In the leadership page's **Crew** section, click **Reset PIN** next to your name. On the crew page, sign out and sign back in with the new PIN.
+8. **PIN reset:** In the leadership page's **Crew** section, click **Reset PIN** next to your name. On the crew page, sign out and sign back in with the new PIN.
 
 **Clear the test data** afterward, directly in the sheet:
 - Set line C back to **Not Started** with **Done** at **0**.
@@ -164,7 +166,7 @@ Run through these on your phone. The crew page's status line should say **Up to 
 
 1. **Print the signs.** Open `/signs.html` on the **live site**, not a downloaded copy, and click **Print signs**. You get one sign per stack in its tape color, plus a saw-station sign that opens the safety check-in. Print on letter paper, and use color if you can.
 2. **Count the spare wood first.** Have one or two people go through the spare pile with **Count spare wood**, choosing **A full recount** for each size. Until that's done, the cut plan assumes every piece needs a new board.
-3. **Share the links.** Text the crew page link, or let people scan any stack sign. Everyone taps **I'm new** once and screenshots their PIN; their phone remembers them after that. Send the leadership link to the directors, and give them the leadership PIN if they'll answer questions or reset crew PINs.
+3. **Share the links.** Text the crew page link, or let people scan any stack sign. Everyone taps **I'm new** once and screenshots their PIN; their phone remembers them after that. Send the leadership link to the directors, then make them leaders from the **Crew** section so they sign in with their own names and PINs. Keep the master PIN to yourself.
 4. **Make your first lumber run** from the leadership page's **Lumber to buy** table, right after the spare-wood count. When lumber comes back, add it with **Count spare wood > More boards**.
 
 ---
@@ -178,6 +180,8 @@ Run through these on your phone. The crew page's status line should say **Up to 
 | Change the email time | Change **Summary hour** in Settings, then run **setup** again. |
 | Add a crew member | They join themselves from the crew page. To add someone yourself, type their name in the **Crew** tab and run **setup** to give them a PIN. |
 | Someone forgot their PIN | Leadership page **> Crew > Reset PIN**, then tell them the new one in person. Or look it up in the **Crew** tab. |
+| Give someone the leadership page | Leadership page **> Crew > Make leader**. They sign in with their own name and PIN. |
+| Everyone's locked out of leadership | Sign in with the master PIN from **Project Settings > Script properties > LEAD_PIN**, then make someone a leader. |
 | Remove someone | Set **Active** to No in the **Crew** tab. Their past sign-offs stay in the Log. |
 | Change a unit or its parts | Edit the **Units** tab, using `Label×count` separated by commas. |
 | Update the website files | Commit the changed file on GitHub. Pages redeploys within a minute or two; people may need to refresh. |
