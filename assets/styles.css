@@ -570,3 +570,57 @@ dialog.tour { width: min(560px, calc(100% - 24px)); }
   .top-actions { display: grid; grid-template-columns: 1fr 1fr; }
   .top-actions .btn-quiet { font-size: 15px; padding: 10px 8px; text-align: center; }
 }
+
+/* Leadership login link in the brand bar (crew page) */
+.brand-action {
+  margin-left: auto; display: inline-flex; align-items: center; gap: 7px;
+  min-height: 38px; padding: 7px 14px; border-radius: 8px;
+  border: 1.5px solid rgba(255, 255, 255, 0.4); color: #fff; text-decoration: none;
+  font: 600 15px/1 var(--body); white-space: nowrap;
+}
+.brand-action svg { width: 14px; height: 14px; color: var(--tape); }
+.brand-action:hover { border-color: var(--tape); }
+.brand-action:focus-visible { outline-color: var(--tape); }
+@media (max-width: 700px) {
+  .brandbar-inner:has(.brand-action) { column-gap: 8px; row-gap: 8px; }
+  .brandbar-inner:has(.brand-action) .brand { flex-basis: 100%; }
+  .brandbar-inner:has(.brand-action) .brand-tag { order: 4; flex-basis: 100%; border-left: 0; padding-left: 0; margin-top: -4px; }
+  .brand-action { margin-left: 0; flex: 1 1 0; min-width: 0; justify-content: center; font-size: 14px; padding: 8px 10px; min-height: 40px; }
+  .brandbar-inner:has(.brand-action) .brand { margin-bottom: 2px; }
+}
+
+/* ---------- Emergency ---------- */
+.brand-action.emergency { margin-left: 0; border-color: #F0808044; background: #C0242433; }
+.brand-action.emergency svg { color: #FF9A9A; width: 15px; height: 15px; }
+.brand-action.emergency:hover { border-color: #FF9A9A; background: #C0242455; }
+dialog.emergency-sheet .sheet-head h2 { color: var(--buy-text); }
+.call-911 {
+  display: block; text-align: center; text-decoration: none; margin: 0 0 18px;
+  padding: 18px 16px; border-radius: 10px; background: #C62828; color: #fff;
+  box-shadow: inset 0 -4px 0 rgba(0, 0, 0, 0.18);
+}
+.call-911:hover { background: #B01F1F; }
+.call-911-num { display: block; font: 800 40px/1 var(--display); letter-spacing: 0.01em; }
+.call-911-sub { display: block; margin-top: 6px; font-size: 15px; opacity: 0.92; }
+.emergency-heading { margin: 0 0 8px; }
+.emergency-addr p { font-weight: 600; }
+.call-list { list-style: none; margin: 0 0 18px; padding: 0; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.call-list li { border-bottom: 1px solid var(--line); }
+.call-list li:last-child { border-bottom: 0; }
+.call-list a {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  min-height: 58px; padding: 12px 14px; text-decoration: none; color: var(--ink); background: var(--surface);
+}
+.call-who { min-width: 0; }
+.call-who strong { overflow-wrap: anywhere; }
+.call-list a:hover { background: var(--soft); }
+.call-who strong { display: block; font: 700 21px/1.1 var(--cond); }
+@media (max-width: 420px) { .call-who strong { font-size: 19px; } .call-num { font-size: 16px; } }
+.call-who span { font-size: 14px; color: var(--muted); }
+.call-num { font: 600 18px/1 var(--body); color: var(--focus); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.emergency-sheet .call-list { margin-bottom: 14px; }
+.emergency-sheet .guide-box { margin-bottom: 0; }
+@media (max-width: 560px) {
+  .brand-action.emergency { padding: 6px 11px; }
+  .call-911-num { font-size: 34px; }
+}
