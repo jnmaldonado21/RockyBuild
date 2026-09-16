@@ -113,6 +113,8 @@ The crew page's header has a **Leadership login** button, but the leadership pag
 
 **Making someone a leader:** on the leadership page, go to **Crew** and click **Make leader**. They can then open the page with their own PIN. Leaders can reply to crew messages, reset PINs, send the summary, and make other leaders. **Remove leader** puts someone back to crew without touching their sign-offs.
 
+The master PIN works in either sign-in box, so typing it in the wrong one doesn't lock anyone out.
+
 **Guardrails:** the last leader can't be removed, and a leader can't remove their own access, so the page can't be orphaned. The Crew tab's **Leader** column can also be edited by hand.
 
 ### Crew sign-in
