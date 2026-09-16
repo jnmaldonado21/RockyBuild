@@ -63,7 +63,8 @@
              : `<input type="text" id="gateName" autocomplete="name" placeholder="First and last name" value="${C.esc(last)}">`}
          </div>
          <div class="field"><label for="gatePin">Your 4-digit PIN</label>
-           <input type="password" id="gatePin" class="pin-input" inputmode="numeric" maxlength="4" autocomplete="off"></div>`
+           <input type="password" id="gatePin" class="pin-input" inputmode="numeric" maxlength="8" autocomplete="off"></div>
+         <p class="hint">Your 4-digit crew PIN, or the master PIN.</p>`
       : `<div class="field"><label for="gateName">Your name</label>
            <input type="text" id="gateName" autocomplete="name" placeholder="So replies are signed" value="${C.esc(C.store.get('leadLastName', ''))}"></div>
          <div class="field"><label for="gatePin">Master PIN</label>
@@ -76,7 +77,7 @@
   function updateGateButton() {
     const name = ($('gateName') || {}).value || '';
     const pin = ($('gatePin') || {}).value || '';
-    $('gateGo').disabled = L.busy || !name.trim() || (L.gateMode === 'user' ? !/^\d{4}$/.test(pin.trim()) : !pin.trim());
+    $('gateGo').disabled = L.busy || !name.trim() || !/^\d{4,8}$/.test(pin.trim());
   }
   $('gateBody').addEventListener('input', updateGateButton);
   $('gateBody').addEventListener('change', updateGateButton);
@@ -103,7 +104,9 @@
       await load();
       return;
     } catch (err) {
-      showError('gateError', err.shown ? err.message : "Couldn't reach the sheet. Try again when you have signal.");
+      showError('gateError', err.shown
+        ? err.message + (/unknown action/i.test(err.message) ? ' It looks like the Apps Script deployment is still on an older version. In Apps Script, choose Deploy, Manage deployments, Edit, then Version: New version.' : '')
+        : "Couldn't reach the sheet. Try again when you have signal.");
     }
     L.busy = false;
     updateGateButton();
