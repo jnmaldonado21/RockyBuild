@@ -202,6 +202,11 @@ Run through these on your phone. The crew page's status line should say **Up to 
   - The email skips days with no new sign-offs or messages unless **Send when nothing changed** is set to Yes in Settings.
   - Check spam, and check **Summary email** in Settings.
   - To test, run `sendSummaryNow` from the Apps Script editor.
+- **Locked out of the leadership page.** In Apps Script, choose `showLeadershipInfo` from the function dropdown and click **Run**, then open the **Execution log**. It prints the master PIN, who the leaders are, whether the Crew tab has its **Leader** column, and which version of the code the editor has. Running a function from the editor always uses your latest saved code, so this works even when the deployed version is older.
+  - **If it says "Has Leader column: false,"** run `setup` once.
+  - **To make yourself a leader without the web page,** open `makeLeaderNow`, change the name on the `NAME` line to yours, save, and click **Run**. The log prints the PIN to sign in with.
+  - **If sign-in still fails after that,** the deployment is older than your code. Go to **Deploy > Manage deployments**, click the pencil, set **Version** to **New version**, and click **Deploy**.
+  - **To check what's actually deployed,** open your `/exec` URL with `?view=version` on the end. New code returns a small block starting with `{"ok":true,"version":`. If you get an error or a large blob of build data instead, the old version is still live.
 - **"Too many wrong PINs."** After 5 wrong tries, that name is locked for 15 minutes. Resetting the PIN from the leadership page clears the lock right away.
 - **Sign-offs say "Someone else updated this line."** Two people changed the same line, and the tool blocked the second change instead of overwriting the first. Reopen the list and redo the change if it's still needed.
 - **Syntax errors when running setup.** Open **Project Settings** and make sure **Enable Chrome V8 runtime** is checked.
