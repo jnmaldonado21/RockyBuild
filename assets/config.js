@@ -3,7 +3,7 @@
  */
 window.CUT_CONFIG = {
   // Apps Script web app URL (ends in /exec). Leave blank to run in demo mode.
-  apiUrl: 'https://script.google.com/macros/s/AKfycbyWDZh48_ID7NmDZ_c8Fdoc3ZddowWmCumM8Nr4joOLjtoZymc-8dIkfB62oBjISs3p/exec',
+  apiUrl: 'https://script.google.com/macros/s/AKfycbwk-ibukR2KorWRVIYX0cG0ziLYqfg7SXHJ0UoV057VySD5NI8hXj9gqAiVvdkUPD6Q/exec',
 
   // Shown at the top of both pages.
   title: 'Voodoo Rocky',
