@@ -36,6 +36,37 @@ var CutPlanner = (function () {
   }
 
   function isSheetGood(size) { return /'/.test(size) || /\d+\s*x\s*\d+\s*ft/i.test(size); }
+
+  // "96, 144" or [96, 144] or 96 -> [96, 144] (sorted, positive numbers only)
+  function numList(v) {
+    if (v === null || v === undefined || v === '') return [];
+    var arr = Array.isArray(v) ? v : String(v).split(/[,;\/]+/);
+    return arr.map(function (x) { return typeof x === 'number' ? x : parseFloat(String(x).replace(/[^\d.]/g, '')); })
+      .filter(function (x) { return x > 0 && !isNaN(x); });
+  }
+
+  // One cut line can list a length per piece: "12' · 12' · 7'-8\"" or "81\" ×2 + 48\" ×2".
+  // Returns an array with one length per piece, or null if the text is a single length.
+  function lineLengths(text, qty) {
+    var str = String(text || '').replace(/\([^)]*\)/g, ' ');
+    var bits = str.split(/\s*(?:·|,|;|\+|\band\b)\s*/).filter(function (b) { return b.trim(); });
+    if (bits.length < 2) return null;
+    var out = [];
+    for (var i = 0; i < bits.length; i++) {
+      var m = bits[i].match(/^(.*?)(?:\s*[×x*]\s*(\d+))?\s*$/);
+      var len = parseInches(m[1].replace(/-/g, ' '));
+      if (isNaN(len)) return null;
+      var n = m[2] ? parseInt(m[2], 10) : 1;
+      for (var k = 0; k < n; k++) out.push(len);
+    }
+    return out.length === qty ? out.sort(function (a, b) { return b - a; }) : null;
+  }
+
+  // Sheet goods: "23 13/16\" × 80 3/8\" (2 per sheet)" -> 2
+  function perSheet(text) {
+    var m = String(text || '').match(/(\d+)\s*per\s*sheet/i);
+    return m ? Math.max(1, parseInt(m[1], 10)) : 1;
+  }
   function effDone(st, qty) { return st.status === 'Bundled' ? qty : Math.min(st.done || 0, qty); }
   function leftToCut(st, qty) { return (st.status === 'Cut' || st.status === 'Bundled') ? 0 : qty - Math.min(st.done || 0, qty); }
 
@@ -62,7 +93,12 @@ var CutPlanner = (function () {
 
   // Strategy 1: longest piece first, best fit among boards already started,
   // otherwise the shortest spare board that fits, otherwise a new board.
-  function bestFit(pieces, stock, newLen, kerf) {
+  function newLenFor(newLens, len) {
+    for (var i = 0; i < newLens.length; i++) if (len <= newLens[i] + EPS) return newLens[i];
+    return null;
+  }
+
+  function bestFit(pieces, stock, newLens, kerf) {
     var open = [], unused = stock.slice().sort(function (a, b) { return a - b; });
     open.over = [];
     pieces.slice().sort(byLenDesc).forEach(function (p) {
@@ -72,7 +108,7 @@ var CutPlanner = (function () {
         var i = -1;
         for (var j = 0; j < unused.length; j++) if (unused[j] + kerf >= p.len + kerf - EPS) { i = j; break; }
         if (i !== -1) { best = newBin(unused[i], 'stock', kerf); unused.splice(i, 1); }
-        else if (p.len <= newLen + EPS) best = newBin(newLen, 'new', kerf);
+        else if (newLenFor(newLens, p.len)) best = newBin(newLenFor(newLens, p.len), 'new', kerf);
         else { open.over.push(p); return; }
         open.push(best);
       }
@@ -112,7 +148,7 @@ var CutPlanner = (function () {
   }
 
   // Strategy 2: fill spare boards (longest first) as full as possible, then new boards.
-  function stockFirst(pieces, stock, newLen, kerf) {
+  function stockFirst(pieces, stock, newLens, kerf) {
     var pool = pieces.slice().sort(byLenDesc), bins = [];
     stock.slice().sort(function (a, b) { return b - a; }).forEach(function (len) {
       if (!pool.length) return;
@@ -123,7 +159,7 @@ var CutPlanner = (function () {
       bin.pieces.sort(byLenDesc);
       bins.push(bin);
     });
-    var rest = bestFit(pool, [], newLen, kerf);
+    var rest = bestFit(pool, [], newLens, kerf);
     var all = bins.concat(rest);
     all.over = rest.over;
     return all;
@@ -131,8 +167,8 @@ var CutPlanner = (function () {
 
   // Strategy 3: plan everything on new boards, then move whole board patterns onto
   // spare boards that can hold them (each move saves one new board).
-  function swapIn(pieces, stock, newLen, kerf) {
-    var bins = bestFit(pieces, [], newLen, kerf);
+  function swapIn(pieces, stock, newLens, kerf) {
+    var bins = bestFit(pieces, [], newLens, kerf);
     var over = bins.over;
     var unused = stock.slice().sort(function (a, b) { return a - b; });
     bins.map(function (b) { return b; })
@@ -168,15 +204,16 @@ var CutPlanner = (function () {
    */
   function plan(pieces, stock, newLen, kerf) {
     stock = (stock || []).filter(function (L) { return L > 0; });
+    var newLens = numList(newLen).sort(function (a, b) { return a - b; });
     var tooLong = [], unknown = [], ok = [];
-    var longest = Math.max.apply(null, [newLen || 0].concat(stock));
+    var longest = Math.max.apply(null, [0].concat(newLens, stock));
     pieces.forEach(function (p) {
       if (isNaN(p.len)) unknown.push(p);
       else if (p.len > longest + EPS) tooLong.push(p);
       else ok.push(p);
     });
-    var cands = [bestFit(ok, stock, newLen, kerf)];
-    if (stock.length) cands.push(stockFirst(ok, stock, newLen, kerf), swapIn(ok, stock, newLen, kerf));
+    var cands = [bestFit(ok, stock, newLens, kerf)];
+    if (stock.length) cands.push(stockFirst(ok, stock, newLens, kerf), swapIn(ok, stock, newLens, kerf));
     var bins = cands[0];
     cands.forEach(function (c) { if (better(c, bins)) bins = c; });
     tooLong = tooLong.concat(bins.over || []);
@@ -196,14 +233,17 @@ var CutPlanner = (function () {
       if (a.kind !== b.kind) return a.kind === 'stock' ? -1 : 1;
       return b.count - a.count || b.len - a.len || String(a.pieces[0].label).localeCompare(String(b.pieces[0].label), undefined, { numeric: true });
     });
-    var newBoards = 0, stockUsed = 0, usedLens = [];
-    bins.forEach(function (b) { if (b.kind === 'new') newBoards++; else { stockUsed++; usedLens.push(b.len); } });
+    var newBoards = 0, stockUsed = 0, usedLens = [], newByLen = {};
+    bins.forEach(function (b) {
+      if (b.kind === 'new') { newBoards++; newByLen[b.len] = (newByLen[b.len] || 0) + 1; }
+      else { stockUsed++; usedLens.push(b.len); }
+    });
     var stockLeft = stock.slice();
     usedLens.forEach(function (L) { var i = stockLeft.indexOf(L); if (i !== -1) stockLeft.splice(i, 1); });
     return {
-      newBoards: newBoards, stockUsed: stockUsed, stockLeft: stockLeft, patterns: patterns,
+      newBoards: newBoards, newByLen: newByLen, stockUsed: stockUsed, stockLeft: stockLeft, patterns: patterns,
       tooLong: tooLong, unknown: unknown,
-      bound: stock.length ? null : lowerBound(ok.map(function (p) { return p.len; }), newLen, kerf)
+      bound: stock.length || newLens.length !== 1 ? null : lowerBound(ok.map(function (p) { return p.len; }), newLens[0], kerf)
     };
   }
 
@@ -216,8 +256,14 @@ var CutPlanner = (function () {
         var st = stateOf ? stateOf(sh.name, r) : r;
         var n = leftToCut(st, r.qty);
         if (!out[r.dim]) out[r.dim] = [];
+        var lens = lineLengths(r.length, r.qty);
         var len = parseInches(r.length);
-        for (var i = 0; i < n; i++) out[r.dim].push({ label: r.label, area: sh.name, len: len, text: r.length });
+        var share = 1 / perSheet(r.length);
+        // Pieces already done come off the front of the list; the rest are still to cut.
+        for (var i = 0; i < n; i++) {
+          var L = lens ? lens[r.qty - n + i] : len;
+          out[r.dim].push({ label: r.label, area: sh.name, len: L, text: lens ? fmtIn(L) : r.length, share: share });
+        }
       });
     });
     return out;
@@ -227,12 +273,22 @@ var CutPlanner = (function () {
     var l = null;
     (lumber || []).forEach(function (x) { if (x.size === size) l = x; });
     var sheet = isSheetGood(size);
-    var d = { size: size, boardLength: sheet ? null : 96, price: null, spare: sheet ? 0 : 10 };
+    var d = { size: size, boardLength: sheet ? null : 96, boardLengths: sheet ? [] : [96], price: null, prices: [], spare: sheet ? 0 : 10 };
     if (l) {
-      if (l.boardLength !== undefined) d.boardLength = l.boardLength;
-      if (l.price !== undefined) d.price = l.price;
+      var lens = numList(l.boardLengths !== undefined ? l.boardLengths : l.boardLength);
+      if (l.boardLengths !== undefined || l.boardLength !== undefined) {
+        d.boardLengths = lens.slice().sort(function (a, b) { return a - b; });
+        d.boardLength = d.boardLengths.length ? d.boardLengths[0] : null;
+      }
+      var prices = numList(l.prices !== undefined ? l.prices : l.price);
+      if (prices.length) { d.prices = prices; d.price = prices[0]; }
       if (l.spare !== undefined && l.spare !== null) d.spare = l.spare;
     }
+    // Price for a given new-board length (prices are listed in the same order as the lengths).
+    d.priceFor = function (len) {
+      var i = d.boardLengths.indexOf(len);
+      return i >= 0 && d.prices[i] !== undefined ? d.prices[i] : (d.boardLengths.length <= 1 ? d.price : null);
+    };
     return d;
   }
 
@@ -254,21 +310,43 @@ var CutPlanner = (function () {
       sheets.forEach(function (sh) { sh.rows.forEach(function (r) { if (r.type === 'cut' && r.dim === size && (stateOf ? stateOf(sh.name, r) : r).status === 'Need to Purchase') flagged++; }); });
       var out = { size: size, sheet: !cfg.boardLength, boardLength: cfg.boardLength, price: cfg.price, spare: cfg.spare || 0,
                   left: pieces.length, onHand: onHand, stockRows: rows, countedAt: counted ? counted.at : '', countedBy: counted ? counted.by : '', flagged: flagged };
+      out.boardLengths = cfg.boardLengths;
       if (!cfg.boardLength) {
-        out.fromStock = Math.min(onHand, pieces.length);
-        out.newBoards = Math.max(0, pieces.length - onHand);
+        // Sheet goods: some lines fit more than one piece per sheet.
+        var sheetsNeeded = Math.ceil(pieces.reduce(function (a, p) { return a + (p.share || 1); }, 0) - 1e-6);
+        out.sheetsLeft = sheetsNeeded;
+        out.fromStock = Math.min(onHand, sheetsNeeded);
+        out.newBoards = Math.max(0, sheetsNeeded - onHand);
         out.plan = null;
-      } else {
-        var lens = [];
-        rows.forEach(function (s) { for (var i = 0; i < s.count; i++) lens.push(s.length); });
-        var p = plan(pieces, lens, cfg.boardLength, kerf);
-        out.plan = p;
-        out.fromStock = p.stockUsed;
-        out.newBoards = p.newBoards + p.unknown.length;
+        out.byLen = [];
+        out.spareBoards = out.newBoards ? Math.ceil(out.newBoards * out.spare / 100) : 0;
+        out.toBuy = out.newBoards + out.spareBoards;
+        out.cost = cfg.price ? out.toBuy * cfg.price : null;
+        out.buyText = out.toBuy ? out.toBuy + (out.toBuy === 1 ? ' sheet' : ' sheets') : '';
+        return out;
       }
-      out.spareBoards = out.newBoards ? Math.ceil(out.newBoards * out.spare / 100) : 0;
-      out.toBuy = out.newBoards + out.spareBoards;
-      out.cost = cfg.price ? out.toBuy * cfg.price : null;
+      var lens = [];
+      rows.forEach(function (s) { for (var i = 0; i < s.count; i++) lens.push(s.length); });
+      var p = plan(pieces, lens, cfg.boardLengths, kerf);
+      out.plan = p;
+      out.fromStock = p.stockUsed;
+      // Unreadable lengths each get a board of the shortest new length.
+      var byLen = {};
+      Object.keys(p.newByLen).forEach(function (k) { byLen[k] = p.newByLen[k]; });
+      if (p.unknown.length) byLen[cfg.boardLength] = (byLen[cfg.boardLength] || 0) + p.unknown.length;
+      out.newBoards = p.newBoards + p.unknown.length;
+      out.byLen = Object.keys(byLen).map(Number).sort(function (a, b) { return a - b; }).map(function (L) {
+        var n = byLen[L], extra = n ? Math.ceil(n * out.spare / 100) : 0, price = cfg.priceFor(L);
+        return { len: L, name: L % 12 === 0 ? (L / 12) + "'" : fmtIn(L), newBoards: n, spareBoards: extra, toBuy: n + extra,
+                 price: price, cost: price ? (n + extra) * price : null };
+      });
+      out.spareBoards = out.byLen.reduce(function (a, b) { return a + b.spareBoards; }, 0);
+      out.toBuy = out.byLen.reduce(function (a, b) { return a + b.toBuy; }, 0);
+      out.cost = out.byLen.length && out.byLen.every(function (b) { return b.cost != null; })
+        ? out.byLen.reduce(function (a, b) { return a + b.cost; }, 0) : (out.byLen.some(function (b) { return b.cost != null; }) ? null : null);
+      out.costPartial = out.byLen.some(function (b) { return b.cost != null; }) && out.cost == null;
+      out.knownCost = out.byLen.reduce(function (a, b) { return a + (b.cost || 0); }, 0);
+      out.buyText = out.byLen.filter(function (b) { return b.toBuy; }).map(function (b) { return b.toBuy + ' @ ' + b.name; }).join(' + ');
       return out;
     });
   }
@@ -327,6 +405,7 @@ var CutPlanner = (function () {
   return {
     parseParts: parseParts, unitStatus: unitStatus, UNIT_STAGES: UNIT_STAGES,
     parseInches: parseInches, fmtIn: fmtIn, isSheetGood: isSheetGood, effDone: effDone, leftToCut: leftToCut,
+    lineLengths: lineLengths, perSheet: perSheet, numList: numList,
     lowerBound: lowerBound, plan: plan, piecesLeft: piecesLeft, lumberFor: lumberFor, report: report
   };
 })();
