@@ -24,6 +24,9 @@
     (data.log || []).forEach(e => { e.statusFrom = legacy(e.statusFrom); e.statusTo = legacy(e.statusTo); });
     data.units = data.units || [];
     data.claims = data.claims || [];
+    data.projects = data.projects || [];
+    data.steps = data.steps || [];
+    data.buy = data.buy || [];
     return data;
   }
 
@@ -59,6 +62,8 @@
   const lumberReport = (sheets, lumber, stock, stateOf) => P.report(sheets, lumber, stock, CFG.kerf, stateOf);
   const piecesLeftFor = (sheets, stateOf, size, area) =>
     (P.piecesLeft(sheets.filter(s => s.name === area), stateOf)[size] || []).length;
+  const sheetsLeftFor = (sheets, stateOf, size, area) =>
+    Math.ceil((P.piecesLeft(sheets.filter(s => s.name === area), stateOf)[size] || []).reduce((t, p) => t + (p.share || 1), 0) - 1e-6);
 
   /* ---------- Tape colors ---------- */
   const TAPE_HEX = {
@@ -134,7 +139,7 @@
   const demo = {
     state() {
       const s = store.get('demo-state', null);
-      const out = s && s.sheets ? s : clone(window.CUT_DEMO);
+      const out = s && s.sheets && s.v === (window.CUT_DEMO || {}).v ? s : clone(window.CUT_DEMO);
       out.crew = (out.crew || []).map(c => typeof c === 'string' ? { name: c, pin: '1234', joined: '', active: true } : c);
       return out;
     },
@@ -143,7 +148,8 @@
       const s = this.state();
       const cutoff = Date.now() - 6 * 3600000;
       const out = { ok: true, sheets: s.sheets, crew: (s.crew || []).filter(c => c.active).map(c => c.name), tape: s.tape, lumber: s.lumber, stock: s.stock || [],
-                    units: s.units || [], claims: (s.claims || []).filter(c => new Date(c.since).getTime() > cutoff), serverTime: new Date().toISOString() };
+                    units: s.units || [], claims: (s.claims || []).filter(c => new Date(c.since).getTime() > cutoff),
+                    projects: s.projects || [], steps: s.steps || [], buy: s.buy || [], serverTime: new Date().toISOString() };
       if (view === 'lead') {
         out.lumber = s.lumber; out.log = s.log; out.messages = s.messages; out.safety = s.safety || [];
         out.crewInfo = (s.crew || []).map(c => ({ name: c.name, joined: c.joined, active: c.active, leader: !!c.leader, hasPin: !!c.pin }));
@@ -211,13 +217,33 @@
         if (!p.photo || !p.photo.data) return { ok: false, error: 'Add a photo of the finished work before saving.' };
         const find = (sheet, label) => { const sh = s.sheets.find(x => x.name === sheet); return sh && sh.rows.find(r => r.type === 'cut' && r.label === label); };
         const findUnit = c => (s.units || []).find(u => u.area === c.sheet && u.unit === c.label);
+        const findStep = c => (s.steps || []).find(x => x.area === c.sheet && x.unit === c.label && String(x.n) === String(c.n));
+        const findBuy = c => (s.buy || []).find(x => x.area === c.sheet && x.item === c.label);
         const conflicts = p.changes.filter(c => {
           if (c.kind === 'unit') { const u = findUnit(c); return !u || u.stage !== c.from.status; }
+          if (c.kind === 'step') { const x = findStep(c); return !x || (x.done ? 'Done' : 'Not done') !== c.from.status; }
+          if (c.kind === 'buy') { const x = findBuy(c); return !x || x.status !== c.from.status; }
           const r = find(c.sheet, c.label); return !r || normStatus(r.status) !== c.from.status || r.done !== c.from.done; })
-          .map(c => ({ sheet: c.sheet, label: c.label, reason: 'changed by someone else' }));
+          .map(c => ({ kind: c.kind, sheet: c.sheet, label: c.label, n: c.n, reason: 'changed by someone else' }));
         if (conflicts.length) return { ok: false, conflicts, error: 'Some lines changed while you were working.' };
         const batch = Math.random().toString(16).slice(2, 10);
         p.changes.forEach(c => {
+          if (c.kind === 'step') {
+            const x = findStep(c);
+            s.log.unshift({ time: now, batch, name: p.name, area: c.sheet, label: c.label + ' step ' + c.n, statusFrom: c.from.status, statusTo: c.to.status, doneFrom: 0, doneTo: 0, photo: p.photo.data, note: p.note || '' });
+            Object.assign(x, { done: c.to.status === 'Done', updated: now, by: p.name });
+            const u = (s.units || []).find(y => y.area === c.sheet && y.unit === c.label);
+            const all = (s.steps || []).filter(y => y.area === c.sheet && y.unit === c.label);
+            if (u && x.done && u.stage === 'Not started') Object.assign(u, { stage: 'Building', updated: now, by: p.name });
+            if (u && all.length && all.every(y => y.done) && ['Not started', 'Building'].includes(u.stage)) Object.assign(u, { stage: 'Built', updated: now, by: p.name });
+            return;
+          }
+          if (c.kind === 'buy') {
+            const x = findBuy(c);
+            s.log.unshift({ time: now, batch, name: p.name, area: c.sheet, label: c.label, statusFrom: c.from.status, statusTo: c.to.status, doneFrom: 0, doneTo: 0, photo: p.photo.data, note: p.note || '' });
+            Object.assign(x, { status: c.to.status, updated: now, by: p.name });
+            return;
+          }
           if (c.kind === 'unit') {
             const u = findUnit(c);
             s.log.unshift({ time: now, batch, name: p.name, area: c.sheet, label: c.label, statusFrom: u.stage, statusTo: c.to.status, doneFrom: 0, doneTo: 0, photo: p.photo.data, note: p.note || '' });
@@ -334,15 +360,34 @@
     toastTimer = setTimeout(() => { t.hidden = true; }, 5000);
   }
 
+  // Letters repeat between areas on purpose (every instruction packet starts at A; the tape
+  // color tells bundles apart). A label used twice inside one area is a real mistake.
   function duplicateLabels(sheets) {
-    const seen = new Map();
-    sheets.forEach(sh => sh.rows.forEach(r => {
-      if (r.type !== 'cut') return;
-      if (!seen.has(r.label)) seen.set(r.label, []);
-      seen.get(r.label).push(sh.name);
-    }));
-    return [...seen].filter(([, where]) => where.length > 1);
+    const out = [];
+    sheets.forEach(sh => {
+      const seen = new Map();
+      sh.rows.forEach(r => { if (r.type === 'cut') seen.set(r.label, (seen.get(r.label) || 0) + 1); });
+      seen.forEach((n, l) => { if (n > 1) out.push([l, [sh.name]]); });
+    });
+    return out;
   }
+
+  /* ---------- Projects, build steps, things to buy ---------- */
+  const PROJECT_STATUSES = ['Active', 'Plans coming', 'Done'];
+  const projectOf = (data, area) => {
+    const p = (data.projects || []).find(x => x.area === area);
+    const status = p && PROJECT_STATUSES.includes(p.status) ? p.status : 'Active';
+    return Object.assign({ area, instructions: '', drawings: '', notes: '' }, p || {}, { status });
+  };
+  const projectTag = st => st === 'Done' ? ' (done)' : st === 'Plans coming' ? ' (plans coming)' : '';
+  const BUY_STATUSES = [
+    { name: 'Need', cls: 's-buy', label: 'Still need' },
+    { name: 'Bought', cls: 's-tag', label: 'Bought' },
+    { name: 'Have', cls: 's-cut', label: 'Already have' }
+  ];
+  const stepKey = (area, unit, n) => 'step::' + area + '::' + unit + '::' + n;
+  const buyKey = (area, item) => 'buy::' + area + '::' + item;
+  const stepsFor = (steps, area, unit) => (steps || []).filter(x => x.area === area && (unit == null || x.unit === unit));
 
   const projectTitle = (fallback = 'Cut list') => {
     const t = String(CFG.title || '').trim();
@@ -354,8 +399,9 @@
   window.Cut = {
     CFG, DEMO, STATUSES, CLS, normStatus, normalizeLead: normalize, esc, clone, store, api, today, projectTitle,
     unitStatus: (sheets, units, stateOf) => P.unitStatus(sheets, units, stateOf), UNIT_STAGES: P.UNIT_STAGES,
-    effDone, leftToCut, pieceRange, bundlesFor, parseInches, fmtIn, lumberFor, lumberReport, piecesLeftFor, isSheetGood,
+    effDone, leftToCut, pieceRange, bundlesFor, parseInches, fmtIn, lumberFor, lumberReport, piecesLeftFor, sheetsLeftFor, isSheetGood,
     tapeHex, inkOn, swatch, timeAgo, compressImage, photoThumb, photoLink,
-    tapeMeasure, setTape, miniBar, setSync, toast, duplicateLabels
+    tapeMeasure, setTape, miniBar, setSync, toast, duplicateLabels,
+    PROJECT_STATUSES, projectOf, projectTag, BUY_STATUSES, stepKey, buyKey, stepsFor
   };
 })();
