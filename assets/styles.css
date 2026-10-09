@@ -384,7 +384,7 @@ body.has-savebar .toast { bottom: 96px; }
 .unit-group { margin-top: 20px; }
 .unit-group h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; }
 .unit-group h3 .pill { font-size: 15px; padding: 5px 10px; }
-.units { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+.units { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
 .unit { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px; }
 .unit.staged { box-shadow: inset 5px 0 0 var(--ink); }
 .unit-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
@@ -635,3 +635,38 @@ dialog.emergency-sheet .sheet-head h2 { color: var(--buy-text); }
 .gate-foot { margin: 18px 0 0; padding-top: 14px; border-top: 1px solid var(--line); }
 .crew-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .crew-actions .btn-quiet { min-height: 36px; padding: 6px 12px; font-size: 14px; }
+
+/* ---------- v3: projects, build steps, buy list ---------- */
+.progress-sub { margin-top: 2px; color: var(--muted); }
+.progress-sub strong { color: var(--ink); }
+.area-banner .project-line { flex: 1 1 100%; margin: 4px 0 0; color: var(--muted); font-size: 15px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.project-line .pill { font-size: 13px; }
+.project-links { font-weight: 600; }
+tr.note-row td { padding: 18px 14px; color: var(--muted); font-size: 15px; background: var(--surface); }
+
+.steps { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 8px; }
+.steps summary { cursor: pointer; font: 700 17px/1.2 var(--cond); display: flex; gap: 8px; align-items: baseline; padding: 4px 0; }
+.steps summary .when { font: 400 14px/1 var(--body); }
+.step-list { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 6px; }
+.step-list li { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: start; padding: 8px; border-radius: 6px; background: var(--soft); }
+.step-list li.done { background: var(--tag-tint); }
+.step-list li.staged { box-shadow: inset 4px 0 0 var(--ink); }
+.step-toggle { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 4px 10px 4px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); font: 600 15px/1 var(--body); color: var(--ink); cursor: pointer; }
+.step-toggle[aria-pressed="true"] { border-color: var(--tag-edge); }
+.step-box { width: 26px; height: 26px; border: 2px solid var(--ns-edge); border-radius: 5px; display: inline-flex; align-items: center; justify-content: center; font-weight: 800; color: #fff; }
+.step-toggle[aria-pressed="true"] .step-box { background: var(--tag-edge); border-color: var(--tag-edge); }
+.step-n { white-space: nowrap; }
+.step-text { display: flex; flex-direction: column; gap: 2px; font-size: 15px; padding-top: 2px; }
+.step-text > span { color: var(--muted); }
+.step-text .unsaved-tag { margin-top: 2px; }
+
+.buy-box { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px; margin-top: 14px; }
+.buy-box h3 { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.buy-box h3 .when { font: 400 15px/1 var(--body); }
+.buy-lumber { margin: 0; padding-left: 20px; font-size: 16px; }
+.buy-lumber li { margin: 2px 0; }
+.buy-table select.status { width: auto; min-width: 140px; }
+.buy-table td small, .buy-table th small { display: block; color: var(--muted); font-size: 13px; }
+.buy-table tr.staged td:first-child { box-shadow: inset 4px 0 0 var(--ink); }
+.buy-sub { margin: 10px 0 4px; font-weight: 600; font-size: 15px; }
+.buy-sub:first-of-type { margin-top: 0; }
