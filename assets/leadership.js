@@ -135,6 +135,7 @@
     renderSafety(d);
     renderNow(d);
     renderUnits(d);
+    renderBuyList(d);
     if (!$('crewList').querySelector('.reset-result strong')) renderCrew(d);
     if (!$('inbox').contains(document.activeElement)) renderInbox(d);
     renderLog(d);
@@ -170,15 +171,22 @@
       cuts.forEach(r => { done += C.effDone(r, r.qty); total += r.qty; left += C.leftToCut(r, r.qty); counts[r.status] = (counts[r.status] || 0) + 1; });
       const pct = total ? Math.floor(done / total * 100) : 0;
       const color = d.tape[sh.name];
+      const p = C.projectOf(d, sh.name);
+      const steps = C.stepsFor(d.steps, sh.name);
+      const stepsDone = steps.filter(x => x.done).length;
+      const pill = p.status === 'Done' ? '<span class="pill s-cut">Done</span>' : p.status === 'Plans coming' ? '<span class="pill s-ns">Plans coming</span>' : '<span class="pill s-ip">Active</span>';
+      const buyNeed = (d.buy || []).filter(x => x.area === sh.name && x.status === 'Need').length;
       return `<tr>
-        <th scope="row"><span class="area-name">${color ? C.swatch(color) : ''}${C.esc(sh.name)}</span><small>${C.esc(color ? color + ' tape' : 'No tape color set')}</small></th>
-        <td>${C.miniBar(done, total)} <strong>${pct}%</strong></td>
-        <td class="num">${done} of ${total}<small>bundled</small></td>
-        <td class="num">${left}<small>left to cut</small></td>
-        <td><div class="pills">${C.STATUSES.filter(s => counts[s.name]).map(s => `<span class="pill ${s.cls}">${s.name} ${counts[s.name]}</span>`).join('')}</div></td>
+        <th scope="row"><span class="area-name">${color ? C.swatch(color) : ''}${C.esc(sh.name)}</span><small>${C.esc(color ? color + ' tape' : 'No tape color set')}${p.instructions ? ` · <a href="${C.esc(p.instructions)}" target="_blank" rel="noopener">instructions</a>` : ''}</small></th>
+        <td>${pill}</td>
+        <td>${total ? `${C.miniBar(done, total)} <strong>${pct}%</strong>` : '<small>—</small>'}</td>
+        <td class="num">${total ? `${done} of ${total}<small>bundled</small>` : '—'}</td>
+        <td class="num">${total ? `${left}<small>left to cut</small>` : '—'}</td>
+        <td class="num">${steps.length ? `${stepsDone} of ${steps.length}<small>steps done</small>` : '—'}</td>
+        <td class="num">${buyNeed ? `${buyNeed}<small>items to buy</small>` : '—'}</td>
       </tr>`;
     }).join('');
-    $('areasTable').innerHTML = `<thead><tr><th scope="col">Area</th><th scope="col">Progress</th><th scope="col" class="num">Pieces</th><th scope="col" class="num">Still to cut</th><th scope="col">Lines by status</th></tr></thead><tbody>${rows}</tbody>`;
+    $('areasTable').innerHTML = `<thead><tr><th scope="col">Project</th><th scope="col">Status</th><th scope="col">Cut progress</th><th scope="col" class="num">Pieces</th><th scope="col" class="num">Still to cut</th><th scope="col" class="num">Build steps</th><th scope="col" class="num">Hardware</th></tr></thead><tbody>${rows}</tbody>`;
   }
 
   /* ---------- Lumber ---------- */
@@ -188,21 +196,22 @@
     let totalCost = 0, anyBuy = false, missingPrice = false;
     const rows = report.map(r => {
       const unit = r.sheet ? 'sheets' : 'boards';
-      const newName = r.sheet ? 'Full sheets' : (r.boardLength % 12 === 0 ? `New: ${r.boardLength / 12}' boards` : `New: ${C.fmtIn(r.boardLength)} boards`);
+      const lens = (r.boardLengths || []).map(L => L % 12 === 0 ? `${L / 12}'` : C.fmtIn(L));
+      const newName = r.sheet ? 'Full sheets' : `New: ${lens.join(' or ')} boards`;
       if (r.toBuy > 0) anyBuy = true;
       if (r.toBuy > 0 && r.cost == null) missingPrice = true;
-      if (r.cost) totalCost += r.cost;
+      if (r.cost) totalCost += r.cost; else if (r.knownCost) totalCost += r.knownCost;
       const proof = r.plan && r.plan.bound != null && r.newBoards
         ? (r.plan.newBoards === r.plan.bound ? 'proven minimum' : `at most ${r.plan.newBoards - r.plan.bound} over the minimum`) : '';
       return `<tr>
         <th scope="row"><span class="area-name">${C.esc(r.size)}</span><small>${newName}</small></th>
-        <td class="num">${r.left}<small>pieces</small></td>
+        <td class="num">${r.sheet ? `${r.sheetsLeft}<small>sheets</small>` : `${r.left}<small>pieces</small>`}</td>
         <td class="num">${r.onHand ? `${r.onHand}<small>${r.countedAt ? `counted ${C.esc(C.timeAgo(r.countedAt))}` : ''}</small>` : '<small>Not counted</small>'}</td>
         <td class="num">${r.fromStock}<small>${unit} used</small></td>
         <td class="num"><strong>${r.newBoards}</strong><small>${proof || unit}</small></td>
         <td class="num">${r.spareBoards}<small>${r.spare}% spare</small></td>
-        <td class="num">${r.toBuy ? `<span class="big">${r.toBuy}</span>` : '<span class="ok-text">Covered</span>'}${r.flagged ? `<small>${r.flagged} ${r.flagged === 1 ? 'line' : 'lines'} flagged</small>` : ''}</td>
-        <td class="num">${r.toBuy === 0 ? '—' : r.cost != null ? money(r.cost) : '<small>Add a price in the sheet</small>'}</td>
+        <td class="num">${r.toBuy ? `<span class="big">${r.toBuy}</span>${r.byLen && r.byLen.length > 1 ? `<small>${C.esc(r.buyText)}</small>` : ''}` : '<span class="ok-text">Covered</span>'}${r.flagged ? `<small>${r.flagged} ${r.flagged === 1 ? 'line' : 'lines'} flagged</small>` : ''}</td>
+        <td class="num">${r.toBuy === 0 ? '—' : r.cost != null ? money(r.cost) : r.knownCost ? `${money(r.knownCost)}<small>+ lengths with no price</small>` : '<small>Add a price in the sheet</small>'}</td>
       </tr>`;
     }).join('');
     $('lumberTable').innerHTML = `<thead><tr><th scope="col">Size</th><th scope="col" class="num">Left to cut</th><th scope="col" class="num">Spare on hand</th>
@@ -266,7 +275,7 @@
     const ready = st.filter(x => x.phase === 'Ready').length;
     const doneN = st.filter(x => ['Built', 'Finished', 'Loaded in'].includes(x.phase)).length;
     $('unitCount').textContent = `${doneN} of ${units.length} built, ${ready} ready to start`;
-    $('unitList').innerHTML = `<div class="table-scroll"><table class="data"><thead><tr><th scope="col">Unit</th><th scope="col">Stage</th><th scope="col">Parts</th><th scope="col">Last sign-off</th></tr></thead><tbody>
+    $('unitList').innerHTML = `<div class="table-scroll"><table class="data"><thead><tr><th scope="col">Unit</th><th scope="col">Stage</th><th scope="col">Build steps</th><th scope="col">Parts</th><th scope="col">Last sign-off</th></tr></thead><tbody>
       ${units.map((u, i) => {
         const x = st[i], [txt, cls] = label[x.phase] || [x.phase, 's-ns'];
         const parts = x.missing.length
@@ -274,10 +283,37 @@
           : '<span class="ok-text">All parts bundled</span>';
         const claim = (d.claims || []).find(c => c.kind === 'unit' && c.area === u.area && c.item === u.unit);
         return `<tr><th scope="row">${C.esc(u.unit)}<small>${C.esc(u.area)}${claim ? `, ${C.esc(claim.name)} is on it` : ''}</small></th>
-          <td><span class="pill ${cls}">${C.esc(txt)}</span></td><td>${parts}</td>
+          <td><span class="pill ${cls}">${C.esc(txt)}</span></td><td>${stepCell(d, u)}</td><td>${parts}</td>
           <td>${u.by ? `${C.esc(u.by)}<small>${C.esc(C.timeAgo(u.updated))}${u.photo ? `, <a href="${C.esc(u.photo)}" target="_blank" rel="noopener">photo</a>` : ''}</small>` : '<small>—</small>'}</td></tr>`;
       }).join('')}
     </tbody></table></div>`;
+  }
+
+  function stepCell(d, u) {
+    const list = C.stepsFor(d.steps, u.area, u.unit);
+    if (!list.length) return '<small>—</small>';
+    const done = list.filter(x => x.done);
+    const next = list.find(x => !x.done);
+    return `${done.length} of ${list.length}${next ? `<small>Next: ${/^\d+$/.test(String(next.n)) ? 'step ' + C.esc(next.n) + ', ' : ''}${C.esc(next.step)}</small>` : '<small class="ok-text">All done</small>'}`;
+  }
+
+  /* ---------- Hardware and supplies ---------- */
+  function renderBuyList(d) {
+    const items = d.buy || [];
+    const need = items.filter(x => x.status === 'Need');
+    $('buyCount').textContent = items.length ? `${need.length} still needed` : '';
+    if (!items.length) { $('buyList').innerHTML = '<p class="empty" style="margin:0">Nothing listed. Add items in the Buy tab of the sheet.</p>'; return; }
+    const lab = n => (C.BUY_STATUSES.find(b => b.name === n) || C.BUY_STATUSES[0]);
+    const order = { Need: 0, Bought: 1, Have: 2 };
+    const rows = items.slice().sort((a, b) => (order[a.status] - order[b.status]) || 0).map(x => {
+      const st = lab(x.status);
+      return `<tr><td><span class="pill ${st.cls}">${C.esc(st.label)}</span></td>
+        <th scope="row">${C.esc(x.item)}${x.notes ? `<small>${C.esc(x.notes)}</small>` : ''}</th>
+        <td class="num">${C.esc(x.qty)}</td><td>${C.esc(x.area)}</td>
+        <td>${x.by ? `${C.esc(x.by)}<small>${C.esc(C.timeAgo(x.updated))}${x.photo ? `, <a href="${C.esc(x.photo)}" target="_blank" rel="noopener">photo</a>` : ''}</small>` : '<small>—</small>'}</td></tr>`;
+    }).join('');
+    $('buyList').innerHTML = `<p class="hint" style="margin-top:0">Lumber isn't listed here; it's worked out from the cut lists in Lumber to buy below. The crew marks these Bought from the Buy tab on the crew page, with a photo of the receipt.</p>
+      <div class="table-scroll"><table class="data"><thead><tr><th scope="col">Status</th><th scope="col">Item</th><th scope="col" class="num">How many</th><th scope="col">Project</th><th scope="col">Last update</th></tr></thead><tbody>${rows}</tbody></table></div>`;
   }
 
   /* ---------- Crew and PIN resets ---------- */
