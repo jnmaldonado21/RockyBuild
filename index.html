@@ -9,7 +9,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,600..900&display=swap" rel="stylesheet">
 <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2212%22%20fill%3D%22%231C232B%22/%3E%3Cg%20transform%3D%22translate%280%208%29%22%3E%3Cg%20stroke-linecap%3D%22round%22%20fill%3D%22none%22%20stroke%3D%22%23fff%22%3E%3Cpath%20d%3D%22M19%2016%20L15%2043%20M45%2016%20L49%2043%22%20stroke-width%3D%224.5%22%20opacity%3D%220.5%22/%3E%3Cpath%20d%3D%22M14%2016%20L6%2044%20M50%2016%20L58%2044%22%20stroke-width%3D%226%22/%3E%3Cpath%20d%3D%22M10%2032%20H54%22%20stroke-width%3D%224.5%22/%3E%3C/g%3E%3Crect%20x%3D%222%22%20y%3D%225%22%20width%3D%2260%22%20height%3D%2212%22%20rx%3D%222.5%22%20fill%3D%22%23F6C21C%22/%3E%3C/g%3E%3C/svg%3E">
-<link rel="stylesheet" href="assets/styles.css?v=20260911c">
+<link rel="stylesheet" href="assets/styles.css?v=20261009a">
 </head>
 <body>
 <div class="brandbar">
@@ -59,6 +59,7 @@
     <div class="progress">
       <p class="progress-text"><strong id="pDone">0</strong> of <strong id="pTotal">0</strong> pieces labeled and bundled</p>
       <div id="tapeSlot"></div>
+      <p class="progress-text progress-sub" id="pSteps" hidden></p>
       <div class="chips" id="chips" role="group" aria-label="Show only one status"></div>
       <p class="filter-note" id="filterNote" hidden></p>
     </div>
@@ -67,10 +68,12 @@
       <button type="button" role="tab" id="tabList" aria-selected="true" aria-controls="checklist">Checklist</button>
       <button type="button" role="tab" id="tabPlan" aria-selected="false" aria-controls="plan">Cut plan</button>
       <button type="button" role="tab" id="tabBuild" aria-selected="false" aria-controls="build">Build</button>
+      <button type="button" role="tab" id="tabBuy" aria-selected="false" aria-controls="buy">Buy</button>
     </div>
 
     <div id="plan" role="tabpanel" aria-labelledby="tabPlan" hidden></div>
     <div id="build" role="tabpanel" aria-labelledby="tabBuild" hidden></div>
+    <div id="buy" role="tabpanel" aria-labelledby="tabBuy" hidden></div>
 
     <div id="checklist" role="tabpanel" aria-labelledby="tabList">
     <table class="cuts stack">
@@ -111,7 +114,7 @@
     <div class="field" id="soNameField"></div>
     <div class="field">
       <span class="field-label">Photo of the finished work</span>
-      <p class="hint">Get the bundle in frame with the tape label readable.</p>
+      <p class="hint">Bundles: tape label readable. Build steps: the finished step. Purchases: the receipt or the items.</p>
       <label class="photo-pick" id="soPick">
         <input type="file" accept="image/*" id="soPhoto" class="sr-only">
         <span id="soPickText">Take or choose a photo</span>
@@ -300,10 +303,10 @@
   </div>
 </dialog>
 
-<script src="assets/config.js?v=20260911c"></script>
-<script src="assets/demo-data.js?v=20260911c"></script>
-<script src="assets/planner.js?v=20260911c"></script>
-<script src="assets/common.js?v=20260911c"></script>
-<script src="assets/crew.js?v=20260911c"></script>
+<script src="assets/config.js?v=20261009a"></script>
+<script src="assets/demo-data.js?v=20261009a"></script>
+<script src="assets/planner.js?v=20261009a"></script>
+<script src="assets/common.js?v=20261009a"></script>
+<script src="assets/crew.js?v=20261009a"></script>
 </body>
 </html>
