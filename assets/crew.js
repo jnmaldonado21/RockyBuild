@@ -3,8 +3,8 @@
   const $ = id => document.getElementById(id);
   const ALL = '__all__';
   const S = { sheets: [], crew: [], tape: {}, lumber: [], messages: [], index: new Map(), current: '', filter: null, sig: '', lastError: '', loaded: false,
-              units: [], claims: [], warned: new Set(),
-              view: ['list', 'plan', 'build'].includes(C.store.get('view', 'list')) ? C.store.get('view', 'list') : 'list' };
+              units: [], claims: [], warned: new Set(), projects: [], steps: [], buy: [],
+              view: ['list', 'plan', 'build', 'buy'].includes(C.store.get('view', 'list')) ? C.store.get('view', 'list') : 'list' };
   const staged = new Map(Object.entries(C.store.get('staged', {})));
   const keyOf = (sheet, label) => sheet + '::' + label;
   let soPhoto = null, askPhoto = null, busy = false;
@@ -20,6 +20,9 @@
       S.stock = d.stock || [];
       S.units = d.units || [];
       S.claims = d.claims || [];
+      S.projects = d.projects || [];
+      S.steps = d.steps || [];
+      S.buy = d.buy || [];
       S.messages = d.messages || [];
       S.index = new Map();
       S.sheets.forEach(sh => sh.rows.forEach(r => { if (r.type === 'cut') S.index.set(keyOf(sh.name, r.label), { sheet: sh.name, item: r }); }));
@@ -53,11 +56,11 @@
   function buildPicker() {
     const sel = $('area');
     const names = S.sheets.map(s => s.name);
-    const sig = names.join('|');
+    const sig = names.map(n => n + C.projectTag(proj(n).status)).join('|');
     if (sel.dataset.sig === sig) return;
     sel.dataset.sig = sig;
     sel.innerHTML = '<option value="">Choose an area…</option>' +
-      names.map(n => `<option value="${C.esc(n)}">${C.esc(n)}</option>`).join('') +
+      names.map(n => `<option value="${C.esc(n)}">${C.esc(n + C.projectTag(proj(n).status))}</option>`).join('') +
       `<option value="${ALL}">All areas</option>`;
     let target = S.current;
     if (!target) {
@@ -90,6 +93,8 @@
     }
   }
 
+  const proj = area => C.projectOf(S, area);
+
   /* ================= Rendering ================= */
   const shown = (key, it) => staged.has(key) ? staged.get(key).to : { status: it.status, done: it.done };
 
@@ -121,6 +126,10 @@
         b.rows.forEach(r => html.push(r.type === 'section'
           ? `<tr class="section"><th colspan="6" scope="rowgroup">${C.esc(r.text)}</th></tr>`
           : rowHTML(b.sheet, r)));
+        if (!b.rows.some(r => r.type === 'cut')) {
+          const st = proj(b.sheet).status;
+          html.push(`<tr class="note-row"><td colspan="6">${st === 'Plans coming' ? 'Plans are still being drawn. Nothing to cut yet.' : 'No cuts listed for this area.'}</td></tr>`);
+        }
       });
       $('rows').innerHTML = html.join('');
     }
@@ -135,21 +144,25 @@
     $('tabList').setAttribute('aria-selected', v === 'list');
     $('tabPlan').setAttribute('aria-selected', v === 'plan');
     $('tabBuild').setAttribute('aria-selected', v === 'build');
+    if ($('tabBuy')) $('tabBuy').setAttribute('aria-selected', v === 'buy');
     $('checklist').hidden = v !== 'list';
     $('plan').hidden = v !== 'plan';
     $('build').hidden = v !== 'build';
+    if ($('buy')) $('buy').hidden = v !== 'buy';
     $('chips').hidden = v !== 'list';
     $('filterNote').hidden = v !== 'list' || !S.filter;
     if (v === 'plan') renderPlan();
     if (v === 'build') renderBuild();
+    if (v === 'buy') renderBuy();
   }
   $('tabList').addEventListener('click', () => setView('list'));
   $('tabPlan').addEventListener('click', () => setView('plan'));
   $('tabBuild').addEventListener('click', () => setView('build'));
+  if ($('tabBuy')) $('tabBuy').addEventListener('click', () => setView('buy'));
   $('tabList').parentElement.addEventListener('keydown', e => {
-    const order = ['list', 'plan', 'build'], ids = { list: 'tabList', plan: 'tabPlan', build: 'tabBuild' };
+    const order = ['list', 'plan', 'build', 'buy'], ids = { list: 'tabList', plan: 'tabPlan', build: 'tabBuild', buy: 'tabBuy' };
     if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
-    const next = order[(order.indexOf(S.view) + (e.key === 'ArrowRight' ? 1 : 2)) % 3];
+    const next = order[(order.indexOf(S.view) + (e.key === 'ArrowRight' ? 1 : 3)) % 4];
     setView(next); $(ids[next]).focus();
   });
 
@@ -179,18 +192,20 @@
       const relevant = pt => showAll || pt.pieces.some(p => p.area === area);
       if (!r.left) return `<div class="plan-size"><div class="plan-size-head"><h4>${C.esc(r.size)}</h4></div><p class="plan-done">Every ${C.esc(r.size)} piece is cut.</p></div>`;
       if (r.sheet) {
-        const mine = area && !showAll ? C.piecesLeftFor(S.sheets, stateOf, r.size, area) : r.left;
+        const mine = area && !showAll ? C.sheetsLeftFor(S.sheets, stateOf, r.size, area) : r.sheetsLeft;
         return `<div class="plan-size"><div class="plan-size-head"><h4>${C.esc(r.size)}</h4>
-          <p>${mine} full ${mine === 1 ? 'sheet' : 'sheets'} still needed${area && !showAll ? ` for ${C.esc(area)}` : ''}, no cutting. ${r.onHand ? `${r.fromStock} can come from spare sheets.` : ''}</p></div></div>`;
+          <p>${mine} full ${mine === 1 ? 'sheet' : 'sheets'} still needed${area && !showAll ? ` for ${C.esc(area)}` : ''}. Cut the pieces listed in the checklist. ${r.onHand ? `${r.fromStock} can come from spare sheets.` : ''}</p></div></div>`;
       }
       const plan = r.plan;
-      const newName = r.boardLength % 12 === 0 ? `${r.boardLength / 12}' boards` : `${C.fmtIn(r.boardLength)} boards`;
+      const boardName = L => L % 12 === 0 ? `${L / 12}' boards` : `${C.fmtIn(L)} boards`;
+      const newName = (r.byLen && r.byLen.length > 1) ? r.byLen.map(b => b.name).join(' and ') + ' boards' : boardName(r.boardLength);
       const pats = plan.patterns.filter(relevant);
       const block = kind => {
         const list = pats.filter(pt => pt.kind === kind);
         if (!list.length) return '';
-        const title = kind === 'stock' ? 'From spare wood (use these first)' : `From new ${newName}`;
-        return `<p class="plan-group">${title}</p>` + list.map(pt => patternHTML(pt, area, colorOf, kind)).join('');
+        if (kind === 'stock') return `<p class="plan-group">From spare wood (use these first)</p>` + list.map(pt => patternHTML(pt, area, colorOf, kind)).join('');
+        const lens = [...new Set(list.map(pt => pt.len))].sort((a, b) => a - b);
+        return lens.map(L => `<p class="plan-group">From new ${boardName(L)}</p>` + list.filter(pt => pt.len === L).map(pt => patternHTML(pt, area, colorOf, kind)).join('')).join('');
       };
       const hidden = plan.patterns.length - pats.length;
       const warn = [];
@@ -222,7 +237,7 @@
     const off = pt.offcut;
     const offText = off < 0.0625 ? 'no offcut' : `offcut ${C.fmtIn(off)}${off >= 24 ? ', keep it as spare wood' : ''}`;
     const desc = pt.pieces.map(p => `${p.label} ${C.fmtIn(p.len)}${nameAreas ? ` (${p.area})` : ''}`).join(' + ');
-    const boardName = kind === 'stock' ? `${C.fmtIn(len)} spare` : 'new';
+    const boardName = kind === 'stock' ? `${C.fmtIn(len)} spare` : len % 12 === 0 ? `new ${len / 12}'` : 'new';
     return `<div class="pattern">
       <div class="pattern-count"><b>×${pt.count}</b><span>${boardName}</span></div>
       <div><div class="board" role="img" aria-label="${C.esc(C.fmtIn(len))} board: ${C.esc(desc)}, ${C.esc(offText)}">${segs}</div>
@@ -363,10 +378,15 @@
       return;
     }
     const color = S.tape[S.current];
-    box.innerHTML = color
+    const p = proj(S.current);
+    const pill = p.status === 'Done' ? '<span class="pill s-cut">Done</span>' : p.status === 'Plans coming' ? '<span class="pill s-ns">Plans coming</span>' : '';
+    const links = [p.instructions ? `<a href="${C.esc(p.instructions)}" target="_blank" rel="noopener">Open the instructions</a>` : '',
+                   p.drawings ? `<a href="${C.esc(p.drawings)}" target="_blank" rel="noopener">Blueprint sheets</a>` : ''].filter(Boolean).join(' · ');
+    const info = (pill || p.notes || links) ? `<p class="project-line">${pill} ${C.esc(p.notes || '')}${links ? ` <span class="project-links">${links}</span>` : ''}</p>` : '';
+    box.innerHTML = (color
       ? `${C.swatch(color, 'lg')}<p><strong>${C.esc(S.current)}</strong> bundles get <strong>${C.esc(color.toLowerCase())}</strong> tape.</p>
          <button type="button" class="linkish" data-guide>How to label and bundle</button>`
-      : `<p>No tape color is set for ${C.esc(S.current)} yet. Ask leadership before bundling.</p>`;
+      : `<p>No tape color is set for ${C.esc(S.current)} yet. Ask leadership before bundling.</p>`) + info;
   }
 
   function rowHTML(sheet, it) {
@@ -449,8 +469,15 @@
     $('pDone').textContent = done;
     $('pTotal').textContent = total;
     C.setTape($('tape'), done, total);
+    const areaSteps = S.steps.filter(x => S.current === ALL || x.area === S.current);
+    const stepsDone = areaSteps.filter(x => stepShown(x)).length;
+    if ($('pSteps')) {
+      $('pSteps').hidden = !areaSteps.length;
+      $('pSteps').innerHTML = `<strong>${stepsDone}</strong> of <strong>${areaSteps.length}</strong> build steps done`;
+    }
     renderPlan();
     renderBuild();
+    renderBuy();
 
     $('chips').innerHTML = C.STATUSES.map(s => {
       const pressed = S.filter === s.name;
@@ -707,6 +734,18 @@
 
   /* ================= Sign-off ================= */
   function describe(s) {
+    if (s.kind === 'step') {
+      const x = S.steps.find(y => y.area === s.sheet && y.unit === s.label && String(y.n) === String(s.n));
+      if (!x) return { use: s.label, text: 'This step is no longer on the list and will be skipped.', conflict: true };
+      const now = x.done ? 'Done' : 'Not done';
+      return { use: `${s.label}, step ${s.n}: ${x.step}`, text: s.to.status === 'Done' ? 'Mark done' : 'Mark not done', conflict: now !== s.from.status, now };
+    }
+    if (s.kind === 'buy') {
+      const x = S.buy.find(y => y.area === s.sheet && y.item === s.label);
+      if (!x) return { use: s.label, text: 'This item is no longer on the list and will be skipped.', conflict: true };
+      const lab = n => (C.BUY_STATUSES.find(b => b.name === n) || { label: n }).label;
+      return { use: `${s.label} (${x.qty})`, text: `${lab(s.from.status)} → ${lab(s.to.status)}`, conflict: x.status !== s.from.status, now: lab(x.status) };
+    }
     if (s.kind === 'unit') {
       const u = S.units.find(x => x.area === s.sheet && x.unit === s.label);
       if (!u) return { use: s.label, text: 'This unit is no longer on the list and will be skipped.', conflict: true };
@@ -727,7 +766,7 @@
     const list = [...staged.values()];
     $('changeList').innerHTML = list.map(s => {
       const d = describe(s);
-      return `<li><span class="lab">${s.kind === 'unit' ? '⌂' : C.esc(s.label)}</span><span class="what"><strong>${C.esc(d.use)}</strong> <span class="optional">(${C.esc(s.sheet)})</span><br>${C.esc(d.text)}</span>
+      return `<li><span class="lab">${s.kind === 'unit' ? '⌂' : s.kind === 'step' ? '✓' : s.kind === 'buy' ? '$' : C.esc(s.label)}</span><span class="what"><strong>${C.esc(d.use)}</strong> <span class="optional">(${C.esc(s.sheet)})</span><br>${C.esc(d.text)}</span>
         ${d.conflict && d.now ? `<span class="conflict">Someone else updated this line since you started. It now shows ${C.esc(d.now)}. Saving will skip it.</span>` : ''}</li>`;
     }).join('') || '<li>No changes left to save.</li>';
     updateSoButton();
@@ -770,7 +809,8 @@
         C.toast(`Saved ${changes.length} ${changes.length === 1 ? 'change' : 'changes'}. Thanks, ${name.split(' ')[0]}.`);
         await load();
       } else if (res.conflicts && res.conflicts.length) {
-        res.conflicts.forEach(c => staged.delete(c.kind === 'unit' ? unitKey(c.sheet, c.label) : keyOf(c.sheet, c.label)));
+        res.conflicts.forEach(c => staged.delete(c.kind === 'unit' ? unitKey(c.sheet, c.label)
+          : c.kind === 'step' ? C.stepKey(c.sheet, c.label, c.n) : c.kind === 'buy' ? C.buyKey(c.sheet, c.label) : keyOf(c.sheet, c.label)));
         C.store.set('staged', Object.fromEntries(staged));
         await load();
         const labels = res.conflicts.map(c => c.label).join(', ');
@@ -929,8 +969,12 @@
         </dl>
       </div>
 
-      <div class="guide-box"><h3>MDF sheets</h3>
-        <p>The 4'x8' MDF sheets don't get bundled. Write the label in one corner of the face (for example O1, O2), put a strip of the area's tape on the edge next to it, and stack the sheets flat with that area. Keep MDF flat, dry, and off a bare concrete floor, since it swells if it gets damp. Carry sheets on edge with two people; the corners crush easily.</p>
+      <div class="guide-box"><h3>Same letters, different areas</h3>
+        <p>Every area's letters match its printed instructions, so most areas have an A, a B, and so on. The tape color is what tells them apart: a red-taped A belongs to Roofs, a yellow-taped A to the Mausoleum. Never stack a piece without its tape.</p>
+      </div>
+
+      <div class="guide-box"><h3>Sheets: luan, OSB and plywood</h3>
+        <p>Sheet pieces don't get bundled. Write the label in one corner of the face (for example E1, E2), put a strip of the area's tape on the edge next to it, and stack them flat with that area. Keep sheets flat, dry, and off a bare concrete floor. Carry full sheets on edge with two people; the corners crush easily.</p>
       </div>
 
       <div class="guide-box"><h3>Mistakes and leftovers</h3>
@@ -1015,7 +1059,7 @@
       { kicker: 'Tackle', title: 'Claim a task, then cut',
         body: `Found something to work on? Tap <strong>I'm on it</strong>. Your name shows up for everyone, so two people don't cut the same pieces. The <strong>Cut plan</strong> tab shows which pieces come out of each board, spare wood first.`,
         art: `<div class="mock-stack"><div class="mock-row"><span class="claim-btn">I'm on it</span><span class="mock-arrow" aria-hidden="true">→</span><span class="claim mine">You're on it</span></div>
-          <div class="board mock-board"><span class="seg" style="width:52%;--area:${red}">L 50"</span><span class="seg" style="width:25%;--area:${C.tapeHex(S.tape[areas[3]] || 'Green')}">AR</span><span class="seg" style="width:22%;--area:${C.tapeHex(S.tape[areas[2]] || 'Blue')}">AJ</span></div></div>` },
+          <div class="board mock-board"><span class="seg" style="width:52%;--area:${red}">D 46 1/2"</span><span class="seg" style="width:25%;--area:${C.tapeHex(S.tape[areas[3]] || 'Green')}">C</span><span class="seg" style="width:22%;--area:${C.tapeHex(S.tape[areas[2]] || 'Blue')}">B</span></div></div>` },
       { kicker: 'Tackle', title: 'Number it, bundle it',
         body: `Number every piece as you cut it: A1, A2, A3. Bundle up to ${C.CFG.maxBundle} of the same letter, tape both ends in your area's color, write the letter and numbers on the tape, and stack it with that color. The full steps are under <strong>How to label and bundle</strong>.`,
         art: `<div class="mock-bundle">${bundleSVG(red, 'A 1–10', ['A1', 'A2', 'A3'])}</div>` },
@@ -1028,11 +1072,12 @@
         body: `When you're done, tap <strong>Sign off and save</strong> at the bottom and take a photo with the tape label readable. Nothing saves without a photo. Leadership sees your work right away, and your claim clears once the line is Bundled.`,
         art: `<div class="mock-savebar"><p><strong>2</strong> changes not saved yet</p><span class="btn on-dark">Sign off and save</span></div>` },
       { kicker: 'Complete', title: 'Build it',
-        body: `When every piece a unit needs is bundled, it shows up as <strong>Ready to build</strong> on the <strong>Build</strong> tab. Change its stage as you build and sign off with a photo, the same as cuts.`,
-        art: `<div class="unit mock-unit"><div class="unit-head"><h4>4' door #1</h4><span class="pill s-tag">Ready to build</span></div>
-          <p class="unit-parts"><span class="part ok">F 2/2</span><span class="part ok">G 2/2</span><span class="part ok">H 2/2</span></p></div>` },
+        body: `When every piece a unit needs is bundled, it shows up as <strong>Ready to build</strong> on the <strong>Build</strong> tab. Check off each step as you finish it; the step numbers match the printed instructions. Sign off with a photo, the same as cuts.`,
+        art: `<div class="unit mock-unit"><div class="unit-head"><h4>S-L</h4><span class="pill s-tag">Ready to build</span></div>
+          <p class="unit-parts"><span class="part ok">A 2/2</span><span class="part ok">B 3/3</span><span class="part ok">C 1/1</span></p>
+          <p class="unit-parts"><span class="part ok">✓ Step 1</span><span class="part">Step 2</span><span class="part">Step 3</span></p></div>` },
       { title: 'Stuck or out of wood?',
-        body: `Set the line to <strong>Need to Purchase</strong> so leadership knows what to buy. For anything else, tap <strong>Message leadership</strong>. Answers show up there for the whole crew.`,
+        body: `The <strong>Buy</strong> tab lists the lumber and hardware still needed; mark things Bought with a photo of the receipt. Out of wood mid-cut? Set the line to <strong>Need to Purchase</strong> so leadership knows. For anything else, tap <strong>Message leadership</strong>. Answers show up there for the whole crew.`,
         art: `<div class="mock-row"><span class="pill s-buy mock-big-pill">Need to Purchase</span><span class="btn-quiet mock-quiet">Message leadership</span></div>` },
       { title: 'Safety first, then go',
         body: `Each day ${APP} offers a one-minute safety check-in: glasses on, hearing protection in, vacuum running, no gloves at the saw.${contacts().length ? ' If someone gets hurt, tap <strong>Emergency</strong> at the top for 911 and the people to call.' : ''} Then you're ready to ${C.esc(TAGLINE.replace(/,\s*([^,]*)$/, ', and $1').toLowerCase())}. You can replay this tour anytime from <strong>How to use ${APP}</strong>.`,
@@ -1188,7 +1233,94 @@
       return `<section class="unit-group"><h3><span class="pill ${cls}">${title}</span> <span class="when">${items.length}</span></h3>
         <div class="units">${items.map(x => unitHTML(x.u, x.st, cls)).join('')}</div></section>`;
     }).join('');
-    $('build').innerHTML = `<p class="plan-note">A unit is ready once every piece it needs is bundled. Change a unit's stage, then sign off with a photo, the same as cuts.</p>` + html;
+    $('build').innerHTML = `<p class="plan-note">A unit is ready once every piece it needs is bundled. Check off each step as you finish it (the step numbers match the printed instructions), then sign off with a photo, the same as cuts. The unit moves to Building at the first step and to Built when every step is done.</p>` + html;
+  }
+
+  /* Build steps: checked off on the unit card, saved with the same sign-off. */
+  const stepShown = x => { const k = C.stepKey(x.area, x.unit, x.n); return staged.has(k) ? staged.get(k).to.status === 'Done' : !!x.done; };
+
+  function stepsHTML(u) {
+    const list = C.stepsFor(S.steps, u.area, u.unit);
+    if (!list.length) return '';
+    const doneN = list.filter(stepShown).length;
+    return `<details class="steps" ${doneN < list.length ? 'open' : ''}><summary><span>Build steps</span> <span class="when">${doneN} of ${list.length} done</span></summary>
+      <ol class="step-list">${list.map(x => {
+        const k = C.stepKey(x.area, x.unit, x.n), on = stepShown(x), st = staged.has(k);
+        return `<li class="${on ? 'done' : ''} ${st ? 'staged' : ''}">
+          <button type="button" class="step-toggle" data-step="${C.esc(k)}" aria-pressed="${on}" aria-label="Step ${C.esc(x.n)}, ${C.esc(x.step)}: ${on ? 'done' : 'not done'}">
+            <span class="step-box" aria-hidden="true">${on ? '✓' : ''}</span>
+            <span class="step-n">${/^\d+$/.test(String(x.n)) ? 'Step ' + C.esc(x.n) : C.esc(x.n)}</span></button>
+          <div class="step-text"><strong>${C.esc(x.step)}</strong>${x.details ? `<span>${C.esc(x.details)}</span>` : ''}
+            ${st ? '<span class="unsaved-tag">Not saved yet</span>' : x.by ? `<span class="when">${on ? 'Done' : 'Unchecked'} by ${C.esc(x.by)}, ${C.esc(C.timeAgo(x.updated))}</span>` : ''}</div></li>`;
+      }).join('')}</ol></details>`;
+  }
+
+  $('build').addEventListener('click', e => {
+    const b = e.target.closest('[data-step]');
+    if (!b) return;
+    const k = b.dataset.step;
+    const x = S.steps.find(y => C.stepKey(y.area, y.unit, y.n) === k);
+    if (!x) return;
+    const from = x.done ? 'Done' : 'Not done';
+    const cur = stepShown(x) ? 'Done' : 'Not done';
+    const to = cur === 'Done' ? 'Not done' : 'Done';
+    if (to === from) staged.delete(k);
+    else staged.set(k, { kind: 'step', sheet: x.area, label: x.unit, n: x.n, row: x.row, from: { status: from, done: 0 }, to: { status: to, done: 0 } });
+    C.store.set('staged', Object.fromEntries(staged));
+    refresh();
+    updateBar();
+  });
+
+  /* ================= Buy list ================= */
+  const buyShown = x => { const k = C.buyKey(x.area, x.item); return staged.has(k) ? staged.get(k).to.status : x.status; };
+
+  function renderBuy() {
+    if (S.view !== 'buy' || !S.current || !$('buy')) return;
+    const stateOf = (sheet, r) => shown(keyOf(sheet, r.label), r);
+    const report = C.lumberReport(S.sheets, S.lumber, S.stock, stateOf).filter(r => r.toBuy > 0);
+    const listOf = rep => `<ul class="buy-lumber">${rep.map(r => `<li><strong>${C.esc(r.size)}:</strong> ${C.esc(r.buyText)}</li>`).join('')}</ul>`;
+    const one = S.current !== ALL ? S.sheets.filter(sh => sh.name === S.current) : null;
+    const mine = one && one.length ? C.lumberReport(one, S.lumber, [], stateOf).filter(r => r.toBuy > 0) : null;
+    const lumber = (mine ? `<p class="buy-sub">${C.esc(S.current)} on its own (new lumber, no spare wood counted):</p>` +
+        (mine.length ? listOf(mine) : '<p class="plan-done" style="padding:0">Nothing left to cut.</p>') +
+        `<p class="buy-sub">Whole shop, after spare wood on hand:</p>` : '') +
+      (report.length ? listOf(report) : '<p class="plan-done" style="padding:0">Every cut is covered by spare wood on hand.</p>');
+    const items = S.buy.filter(x => S.current === ALL || x.area === S.current);
+    const opts = cur => C.BUY_STATUSES.map(b => `<option value="${b.name}" ${b.name === cur ? 'selected' : ''}>${b.label}</option>`).join('');
+    const clsOf = n => (C.BUY_STATUSES.find(b => b.name === n) || C.BUY_STATUSES[0]).cls;
+    const rows = items.map(x => {
+      const k = C.buyKey(x.area, x.item), cur = buyShown(x), st = staged.has(k);
+      return `<tr class="${st ? 'staged' : ''}" data-bkey="${C.esc(k)}">
+        <td><select class="status buy-status ${clsOf(cur)}" aria-label="Status for ${C.esc(x.item)}">${opts(cur)}</select>${st ? '<span class="unsaved-tag">Not saved yet</span>' : ''}</td>
+        <td><strong>${C.esc(x.item)}</strong>${x.notes ? `<small>${C.esc(x.notes)}</small>` : ''}${S.current === ALL ? `<small>${C.esc(x.area)}</small>` : ''}
+          ${x.by && !st ? `<small>${C.esc(cur === 'Bought' ? 'Bought' : 'Updated')} by ${C.esc(x.by)}, ${C.esc(C.timeAgo(x.updated))}</small>` : ''}</td>
+        <td class="num">${C.esc(x.qty)}</td></tr>`;
+    }).join('');
+    const need = items.filter(x => buyShown(x) === 'Need').length;
+    $('buy').innerHTML = `
+      <div class="buy-box"><h3>Lumber still to buy</h3>${lumber}
+        <p class="plan-note" style="padding:0;margin:8px 0 0">Worked out from every cut still to do, plus the extra % for miscuts. Buy the whole-shop list so pieces from different projects can share boards. Bought some? Add it with <button type="button" class="linkish" id="buyCount">Count spare wood</button> and this list shrinks.</p></div>
+      <div class="buy-box"><h3>Hardware and supplies ${items.length ? `<span class="when">${need} still needed</span>` : ''}</h3>
+        ${items.length ? `<div class="table-scroll"><table class="data buy-table"><thead><tr><th scope="col">Status</th><th scope="col">Item</th><th scope="col" class="num">How many</th></tr></thead>
+          <tbody>${rows}</tbody></table></div>
+          <p class="plan-note" style="padding:0;margin:8px 0 0">Bought something? Set it to Bought, then sign off with a photo of the receipt or the items.</p>`
+        : `<p class="plan-note" style="padding:0">Nothing else to buy for ${S.current === ALL ? 'any area' : C.esc(S.current)}.</p>`}</div>`;
+  }
+
+  if ($('buy')) {
+    $('buy').addEventListener('change', e => {
+      if (!e.target.matches('select.buy-status')) return;
+      const k = e.target.closest('[data-bkey]').dataset.bkey;
+      const x = S.buy.find(y => C.buyKey(y.area, y.item) === k);
+      if (!x) return;
+      const to = e.target.value;
+      if (to === x.status) staged.delete(k);
+      else staged.set(k, { kind: 'buy', sheet: x.area, label: x.item, row: x.row, from: { status: x.status, done: 0 }, to: { status: to, done: 0 } });
+      C.store.set('staged', Object.fromEntries(staged));
+      renderBuy();
+      updateBar();
+    });
+    $('buy').addEventListener('click', e => { if (e.target.id === 'buyCount') openStock(); });
   }
 
   function unitHTML(u, st, cls) {
@@ -1203,6 +1335,7 @@
     return `<article class="unit ${isStaged ? 'staged' : ''}" data-ukey="${C.esc(key)}">
       <div class="unit-head"><h4>${C.esc(u.unit)}</h4>${S.current === ALL ? `<span class="when">${C.esc(u.area)}</span>` : ''}</div>
       <p class="unit-parts">${parts || '<span class="when">No parts listed</span>'}</p>
+      ${stepsHTML(u)}
       ${st.unknown.length ? `<p class="plan-note" style="margin:6px 0 0">Can't find ${st.unknown.map(p => C.esc(p.label)).join(', ')} in ${C.esc(u.area)}. Check the Units tab.</p>` : ''}
       <div class="unit-actions">
         <label class="sr-only" for="st-${C.esc(key)}">Stage for ${C.esc(u.unit)}</label>
